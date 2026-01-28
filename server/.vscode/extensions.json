@@ -1,0 +1,20 @@
+{
+    "recommendations": [
+        // 核心 Python 工具
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        // Ruff - 极速的Python代码检查和格式化工具（一体化解决方案）
+        "charliermarsh.ruff",
+        // 辅助插件（提升体验）
+        "usernamehw.errorlens" // 行内显示错误/警告（必加）
+    ],
+    
+    // 可选：指定不推荐的插件（避免冲突）
+    "unwantedRecommendations": [
+        "ms-python.pylint", // 禁用 pylint 推荐（避免和 ruff 冲突）
+        "ms-python.mypy-type-checker", // 若不用 mypy，可禁用
+        "ms-python.black-formatter", // 使用 ruff 替代
+        "ms-python.isort", // 使用 ruff 替代
+        "ms-python.flake8" // 使用 ruff 替代
+    ]
+}

@@ -1,0 +1,215 @@
+# ===================================================================
+# Docker Compose 配置文件 - 开发环境
+# ===================================================================
+# 使用说明:
+# 1. 复制根目录的 .env.example 为 .env: cp .env.example .env
+# 2. 根据需要修改 .env 文件中的配置（特别是密码、密钥等敏感信息）
+# 3. 启动所有服务: docker-compose up -d
+# 4. 查看日志: docker-compose logs -f [service_name]
+# 5. 停止所有服务: docker-compose down
+# ===================================================================
+
+version: '3.8'
+
+services:
+  # ========================================
+  # MySQL 数据库
+  # ========================================
+  mysql:
+    image: mysql:8.0
+    container_name: py-small-admin-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: fastapi_db
+      MYSQL_USER: fastapi_user
+      MYSQL_PASSWORD: fastapi_password
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+      - ./mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - py-small-admin-network
+
+  # ========================================
+  # Redis 缓存
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: py-small-admin-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis123456", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - py-small-admin-network
+
+  # ========================================
+  # RabbitMQ 消息队列
+  # ========================================
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: py-small-admin-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_VHOST: /
+      TZ: Asia/Shanghai
+    ports:
+      - "5672:5672"   # AMQP 端口
+      - "15672:15672" # 管理界面端口
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - py-small-admin-network
+
+  # ========================================
+  # FastAPI 应用服务
+  # ========================================
+  fastapi:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: py-small-admin-fastapi
+    restart: unless-stopped
+    environment:
+      SERVICE_TYPE: fastapi
+    env_file:
+      - ../.env
+    ports:
+      - "8009:8009"
+    volumes:
+      - ../uploads:/app/uploads
+      - ../logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - py-small-admin-network
+
+  # ========================================
+  # Celery Worker
+  # ========================================
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: py-small-admin-celery-worker
+    restart: unless-stopped
+    environment:
+      SERVICE_TYPE: celery-worker
+    env_file:
+      - ../.env
+    volumes:
+      - ../uploads:/app/uploads
+      - ../logs:/app/logs
+    depends_on:
+      - rabbitmq
+      - redis
+      - mysql
+    networks:
+      - py-small-admin-network
+
+  # ========================================
+  # Celery Beat (定时任务)
+  # ========================================
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: py-small-admin-celery-beat
+    restart: unless-stopped
+    environment:
+      SERVICE_TYPE: celery-beat
+    env_file:
+      - ../.env
+    volumes:
+      - ../logs:/app/logs
+    depends_on:
+      - rabbitmq
+    networks:
+      - py-small-admin-network
+
+  # ========================================
+  # Flower 监控 (可选)
+  # ========================================
+  flower:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: py-small-admin-flower
+    restart: unless-stopped
+    environment:
+      SERVICE_TYPE: flower
+    env_file:
+      - ../.env
+    ports:
+      - "5555:5555"
+    depends_on:
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - py-small-admin-network
+
+# ========================================
+# 数据卷定义
+# ========================================
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+# ========================================
+# 网络定义
+# ========================================
+networks:
+  py-small-admin-network:
+    driver: bridge

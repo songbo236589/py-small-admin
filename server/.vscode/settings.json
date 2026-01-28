@@ -1,0 +1,28 @@
+{
+    // ========== 基础环境配置 ==========
+    "python.defaultInterpreterPath": "${workspaceFolder}\\venv\\Scripts\\python.exe", // Windows 虚拟环境
+    "python.analysis.typeCheckingMode": "basic", // Pylance 基础类型检查
+    // ========== Ruff 原生服务器配置（一体化代码工具） ==========
+    "ruff.enable": true,
+    "ruff.path": [
+        "${workspaceFolder}\\venv\\Scripts\\ruff.exe"
+    ], // Windows
+    "ruff.interpreter": [
+        "${workspaceFolder}\\venv\\Scripts\\python.exe"
+    ],
+    "ruff.workingDirectory": "${workspaceFolder}",
+    // Ruff 配置现在在 pyproject.toml 文件中管理
+    // ========== 编辑器自动行为 ==========
+    "editor.formatOnSave": true, // 保存时用 ruff 格式化
+    "editor.defaultFormatter": "charliermarsh.ruff", // 默认格式化器指定为 ruff 插件
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit", // 保存时用 ruff 排序导入
+        "source.removeUnusedImports": "explicit", // 保存时删除未使用的导入
+    },
+    // ========== Pylance 增强配置 ==========
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.completeFunctionParens": true,
+    // ========== 禁用旧版集成（避免冲突） ==========
+    "python.formatting.provider": "none", // 禁用旧版内置格式化
+    "python.linting.enabled": false // 禁用旧版内置 lint（用 ruff 插件）
+}

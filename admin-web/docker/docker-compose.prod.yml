@@ -1,0 +1,66 @@
+# ===================================================================
+# Docker Compose 配置文件 - 前端生产环境
+# ===================================================================
+# 使用说明:
+# 1. 确保 .env.production 文件已配置
+# 2. 启动生产环境: docker-compose -f docker-compose.prod.yml up -d
+# 3. 查看日志: docker-compose -f docker-compose.prod.yml logs -f
+# 4. 停止服务: docker-compose -f docker-compose.prod.yml down
+# 5. 重新构建: docker-compose -f docker-compose.prod.yml build --no-cache
+# ===================================================================
+
+version: '3.8'
+
+services:
+  # ========================================
+  # 前端生产服务
+  # ========================================
+  admin-web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+      args:
+        UMI_APP_ENV: production
+        UMI_APP_API_BASE_URL: http://fastapi:8009
+    image: admin-web:latest
+    container_name: admin-web-prod
+    restart: always
+    ports:
+      - "80:80"
+      # 如果需要HTTPS，取消下面的注释
+      # - "443:443"
+    environment:
+      NODE_ENV: production
+      UMI_ENV: production
+      UMI_APP_ENV: production
+      UMI_APP_API_BASE_URL: http://fastapi:8009
+      UMI_APP_API_KEY: ${UMI_APP_API_KEY:-123456}
+    networks:
+      - py-small-admin-network-prod
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ========================================
+# 网络定义
+# ========================================
+networks:
+  py-small-admin-network-prod:
+    external: true
+    name: py-small-admin-network-prod

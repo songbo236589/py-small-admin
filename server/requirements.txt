@@ -1,0 +1,128 @@
+# FastAPI - 现代、快速的 Web 框架，用于构建 API
+fastapi==0.124.2
+
+# Uvicorn - ASGI 服务器，用于运行 FastAPI 应用
+# [standard] 包含额外的依赖，提供更好的性能和功能
+uvicorn[standard]==0.38.0
+
+# Ruff - 极速的Python代码检查和格式化工具
+# 用于代码检查、导入排序、格式化和删除未使用的导入
+ruff==0.14.8
+
+# Pydantic Settings - 基于 Pydantic 的配置管理库
+# 用于管理应用配置，支持环境变量、配置文件等多种配置源
+pydantic-settings==2.12.0
+
+# Python Multipart - 表单数据处理库
+# FastAPI处理表单数据和文件上传的必需依赖
+python-multipart==0.0.20
+
+# Python Dotenv - 环境变量管理库
+# 从.env文件加载环境变量，支持Pydantic Settings的配置管理
+python-dotenv==1.0.1
+
+# SQLModel - 基于 Pydantic 和 SQLAlchemy 的现代 ORM
+# 结合了 SQLAlchemy 的数据库操作能力和 Pydantic 的数据验证能力
+sqlmodel==0.0.27
+
+# FastAPI Pagination - FastAPI分页库
+# 提供强大的数据分页功能，支持多种分页方式和SQLModel集成
+fastapi-pagination==0.15.3
+
+# MySQL Client - MySQL数据库客户端库
+# 基于C扩展的高性能MySQL驱动，提供更好的性能和稳定性
+mysqlclient==2.2.7
+
+# AsyncMySQL - 异步MySQL驱动
+# 用于FastAPI异步操作MySQL数据库
+aiomysql==0.3.2
+
+# Alembic - SQLAlchemy 的数据库迁移工具
+# 用于管理数据库架构的版本控制和迁移
+alembic==1.17.2
+
+# Redis - Python Redis客户端库
+# 用于实现Redis缓存和集群连接
+redis==7.1.0
+
+# Loguru - 现代化的Python日志库
+# 提供简洁的API、强大的功能和更好的性能
+loguru==0.7.3
+
+# PyJWT - JWT令牌创建和验证库
+# 用于实现JWT认证和授权
+pyjwt==2.10.1
+
+# Passlib - 密码哈希库
+# 提供安全的密码哈希和验证功能，支持多种哈希算法包括bcrypt
+passlib[bcrypt]==1.7.4
+
+# Bcrypt - 密码哈希算法
+# 限制版本以兼容 passlib 1.7.4
+bcrypt==3.2.2
+
+# NumPy - Python科学计算库
+# 用于图像处理和数组操作，特别是在验证码扭曲变形功能中
+numpy==2.2.6
+
+# Pillow - Python图像处理库
+# 用于生成图形验证码
+Pillow==12.0.0
+
+# OSS2 - 阿里云对象存储SDK
+# 用于实现阿里云OSS文件上传功能
+oss2==2.19.1
+
+# COS-Python-SDK-V5 - 腾讯云对象存储SDK
+# 用于实现腾讯云COS文件上传功能
+cos-python-sdk-v5==1.9.40
+
+# Qiniu - 七牛云对象存储SDK
+# 用于实现七牛云Kodo文件上传功能
+qiniu==7.17.0
+
+# FontTools - 字体处理库
+# 用于支持 OTF、TTC、WOFF 等字体格式，增强 Pillow 的字体处理能力
+fonttools==4.61.1
+
+# OpenCV - 计算机视觉库
+# 用于图像处理和扭曲变形，提供更高效的图像重映射功能
+opencv-python==4.12.0.88
+
+# tzdata - IANA时区数据库
+# 为zoneinfo模块提供时区数据，支持Asia/Shanghai等时区标识符
+tzdata==2025.3
+
+# ========== Celery + RabbitMQ 相关依赖 ==========
+
+# Celery - 分布式任务队列
+# 用于实现异步任务处理和定时任务调度
+celery==5.6.2
+
+# Gevent - 协程库
+# 用于 Celery Worker 的协程支持,解决异步任务与事件循环冲突问题
+gevent==24.11.1
+
+# Kombu - Celery 的消息库
+# 提供消息传递功能，支持多种消息代理（RabbitMQ、Redis等）
+kombu==5.6.2
+
+# Billiard - Celery 的多进程库
+# 提供多进程支持，用于 Celery Worker 的并发处理
+billiard==4.2.4
+
+# pytz - Python 时区库
+# 用于时区转换和时区感知的日期时间处理
+pytz==2025.2
+
+# Flower - Celery 监控工具
+# 提供实时监控 Web 界面，用于监控和管理 Celery 任务
+flower==2.0.1
+
+# FastAPI Mail - FastAPI 邮件发送库
+# 用于在 FastAPI 应用中发送电子邮件，支持 HTML 邮件和附件
+fastapi-mail==1.5.9
+
+# AkShare - 金融数据接口库
+# 用于获取股票、基金、期货等金融数据，支持多种数据源
+akshare==1.18.8
