@@ -121,7 +121,12 @@ export default defineConfig({
 function createNav() {
   return [
       { text: '首页', link: '/' },
-      { text: '文档写作指南', link: '/guides/writing-guide' }
+      { text: '文档写作指南', link: '/guides/writing-guide' },
+      { text: '快速开始', link: '/server/getting-started' },
+      { text: '架构设计', link: '/guides/architecture-overview' },
+      { text: '模块开发', link: '/server/module-development' },
+      { text: '任务与队列', link: '/server/celery/celery-guide' },
+      { text: '部署与运维', link: '/server/deployment/deployment-guide' }
     ];
 }
 
@@ -132,6 +137,81 @@ function createSidebar() {
         text: '指南',
         items: [
           { text: '文档写作指南', link: '/guides/writing-guide' }
+        ]
+      },
+      {
+        text: '架构设计',
+        items: [
+          { text: '架构概览', link: '/guides/architecture-overview' },
+          { text: '分层架构说明', link: '/guides/layered-architecture' },
+          { text: '设计模式应用', link: '/guides/design-patterns' },
+          { text: '最佳实践', link: '/guides/best-practices' }
+        ]
+      }
+    ],
+    '/server/': [
+      {
+        text: '快速开始',
+        items: [
+          { text: '快速开始', link: '/server/getting-started' },
+          { text: '项目结构说明', link: '/server/project-structure' },
+          { text: '开发环境搭建', link: '/server/development-setup' },
+          { text: '第一个接口开发', link: '/server/first-api' }
+        ]
+      },
+      {
+        text: '核心模块开发',
+        items: [
+          { text: '模块开发指南', link: '/server/module-development' },
+          { text: 'Admin 模块详解', link: '/server/admin-module' },
+          { text: 'Quant 模块详解', link: '/server/quant-module' },
+          { text: 'Common 模块详解', link: '/server/common-module' }
+        ]
+      },
+      {
+        text: 'API 开发指南',
+        items: [
+          { text: '路由开发指南', link: '/server/api-development/routing-guide' },
+          { text: '控制器开发指南', link: '/server/api-development/controller-guide' },
+          { text: '服务层开发指南', link: '/server/api-development/service-guide' },
+          { text: '模型开发指南', link: '/server/api-development/model-guide' },
+          { text: '验证器开发指南', link: '/server/api-development/validator-guide' },
+          { text: '分页开发指南', link: '/server/api-development/pagination-guide' }
+        ]
+      },
+      {
+        text: '数据库相关',
+        items: [
+          { text: '数据库使用指南', link: '/server/database/database-guide' },
+          { text: '数据库迁移指南', link: '/server/database/migration-guide' },
+          { text: '关系映射指南', link: '/server/database/relationship-guide' },
+          { text: '查询优化指南', link: '/server/database/query-optimization' },
+          { text: '分表使用指南', link: '/server/database/sharding-guide' }
+        ]
+      },
+      {
+        text: '认证与权限',
+        items: [
+          { text: 'JWT 使用指南', link: '/server/authentication/jwt-guide' },
+          { text: 'RBAC 权限模型', link: '/server/authentication/rbac-guide' }
+        ]
+      },
+      {
+        text: '任务与队列',
+        items: [
+          { text: 'Celery 基础指南', link: '/server/celery/celery-guide' },
+          { text: '任务开发指南', link: '/server/celery/task-development' },
+          { text: '队列管理指南', link: '/server/celery/queue-management' },
+          { text: '监控指南', link: '/server/celery/monitoring' }
+        ]
+      },
+      {
+        text: '部署与运维',
+        items: [
+          { text: '部署指南', link: '/server/deployment/deployment-guide' },
+          { text: '监控指南', link: '/server/deployment/monitoring' },
+          { text: '日志指南', link: '/server/deployment/logging' },
+          { text: '故障排查', link: '/server/deployment/troubleshooting' }
         ]
       }
     ]
