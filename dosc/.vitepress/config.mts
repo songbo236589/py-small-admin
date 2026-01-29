@@ -17,7 +17,7 @@ export default defineConfig({
     ['meta', { property: 'og:title', content: 'Py Small Admin - 基于 Python 的轻量级后台管理系统' }],
     ['meta', { property: 'og:description', content: '基于 Python 的轻量级后台管理系统文档' }],
     ['meta', { property: 'og:image', content: '/logo.png' }],
-    ['meta', { property: 'og:url', content: 'https://yourdomain.com' }],
+    // ['meta', { property: 'og:url', content: 'https://yourdomain.com' }],
     ['meta', { property: 'og:site_name', content: 'Py Small Admin' }],
     ['meta', { property: 'og:locale', content: 'zh_CN' }],
 
@@ -28,7 +28,7 @@ export default defineConfig({
     ['meta', { name: 'twitter:image', content: '/logo.png' }],
 
     // Canonical
-    ['link', { rel: 'canonical', href: 'https://yourdomain.com' }]
+    // ['link', { rel: 'canonical', href: 'https://yourdomain.com' }]
   ],
   markdown: {
     //显示行数
@@ -109,7 +109,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/yourusername/py-small-admin' }
+      { icon: 'github', link: 'https://github.com/songbo236589/py-small-admin' }
     ]
   }
 })

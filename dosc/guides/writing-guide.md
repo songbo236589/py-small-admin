@@ -642,7 +642,7 @@ lastUpdated: true;
 
 - [VitePress 官方文档](https://vitepress.dev/)
 - [Markdown 基础语法](https://www.markdownguide.org/basic-syntax/)
-- [项目 GitHub 仓库](https://github.com/yourusername/py-small-admin)
+- [项目 GitHub 仓库](https://github.com/songbo236589/py-small-admin)
 
 ---
 
