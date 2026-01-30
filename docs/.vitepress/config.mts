@@ -120,13 +120,213 @@ export default defineConfig({
  */
 function createNav() {
   return [
-      { text: '首页', link: '/' },
-    ];
+    { text: '首页', link: '/' },
+    { text: '快速开始', link: '/guide/getting-started/' },
+    { text: '后端开发', link: '/guide/backend/' },
+    { text: '前端开发', link: '/guide/frontend/' },
+    { text: 'API 文档', link: '/api/' },
+    { text: '部署运维', link: '/deploy/' },
+    { text: '常见问题', link: '/faq/' },
+  ];
 }
 
 function createSidebar() {
   return {
-    
-    
+    '/guide/': {
+      base: '/guide/',
+      items: [
+        {
+          text: '项目介绍',
+          items: [
+            { text: '项目概述', link: 'introduction/' },
+            { text: '功能特性', link: 'introduction/features' },
+          ],
+        },
+        {
+          text: '快速开始',
+          items: [
+            { text: '环境要求', link: 'getting-started/' },
+            { text: '安装指南', link: 'getting-started/install' },
+            { text: '快速启动', link: 'getting-started/quick-start' },
+            { text: '目录结构', link: 'getting-started/directory' },
+            { text: '配置说明', link: 'getting-started/configuration' },
+          ],
+        },
+        {
+          text: '后端开发',
+          items: [
+            { text: '开发环境搭建', link: 'backend/' },
+            { text: '后端架构', link: 'backend/architecture' },
+            { text: '模块开发规范', link: 'backend/module-guide' },
+            { text: '数据库设计',
+              items: [
+                { text: '数据库概览', link: 'backend/database/' },
+                { text: 'Admin 模块表结构', link: 'backend/database/admin-models' },
+                { text: 'Quant 模块表结构', link: 'backend/database/quant-models' },
+                { text: '数据库迁移', link: 'backend/database/migrations' },
+              ],
+            },
+            { text: 'API 开发',
+              items: [
+                { text: 'API 开发规范', link: 'backend/api/' },
+                { text: 'Admin 模块 API', link: 'backend/api/admin-api' },
+                { text: 'Quant 模块 API', link: 'backend/api/quant-api' },
+                { text: '认证授权', link: 'backend/api/authentication' },
+              ],
+            },
+            { text: '异步任务',
+              items: [
+                { text: '异步任务开发', link: 'backend/async/' },
+                { text: 'Celery 使用指南', link: 'backend/async/celery-guide' },
+                { text: '任务清单', link: 'backend/async/task-list' },
+              ],
+            },
+            { text: '特色功能',
+              items: [
+                { text: '文件上传', link: 'backend/features/upload' },
+                { text: '缓存使用', link: 'backend/features/cache' },
+                { text: '日志系统', link: 'backend/features/log' },
+                { text: '数据验证', link: 'backend/features/validation' },
+                { text: '异常处理', link: 'backend/features/exception' },
+              ],
+            },
+            { text: '配置系统',
+              items: [
+                { text: '配置概览', link: 'backend/config/' },
+                { text: '环境变量', link: 'backend/config/env-variables' },
+              ],
+            },
+          ],
+        },
+        {
+          text: '前端开发',
+          items: [
+            { text: '开发环境搭建', link: 'frontend/' },
+            { text: '前端架构', link: 'frontend/architecture' },
+            { text: '页面开发',
+              items: [
+                { text: '页面开发规范', link: 'frontend/pages/' },
+                { text: 'Admin 模块页面', link: 'frontend/pages/admin-pages' },
+                { text: 'Quant 模块页面', link: 'frontend/pages/quant-pages' },
+              ],
+            },
+            { text: '组件开发',
+              items: [
+                { text: '组件开发规范', link: 'frontend/components/' },
+                { text: '通用组件', link: 'frontend/components/common-comps' },
+                { text: '上传组件', link: 'frontend/components/upload-comps' },
+                { text: '布局组件', link: 'frontend/components/layout-comps' },
+              ],
+            },
+            { text: 'API 服务',
+              items: [
+                { text: 'API 服务封装', link: 'frontend/services/' },
+                { text: '请求工具', link: 'frontend/services/request' },
+                { text: 'API 列表', link: 'frontend/services/api-list' },
+              ],
+            },
+            { text: '特色功能',
+              items: [
+                { text: '路由配置', link: 'frontend/features/routing' },
+                { text: '状态管理', link: 'frontend/features/state' },
+                { text: '认证流程', link: 'frontend/features/auth' },
+                { text: '权限控制', link: 'frontend/features/permission' },
+                { text: 'Excel 导入导出', link: 'frontend/features/excel' },
+              ],
+            },
+            { text: '配置系统',
+              items: [
+                { text: '配置概览', link: 'frontend/config/' },
+                { text: '代理配置', link: 'frontend/config/proxy' },
+                { text: '环境变量', link: 'frontend/config/env-variables' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    '/api/': {
+      base: '/api/',
+      items: [
+        { text: 'API 概览', link: '/' },
+        { text: '认证接口', link: 'authentication' },
+        { text: 'Admin 模块',
+          items: [
+            { text: '管理员管理', link: 'admin/admin' },
+            { text: '角色管理', link: 'admin/group' },
+            { text: '菜单管理', link: 'admin/rule' },
+            { text: '系统配置', link: 'admin/sys-config' },
+            { text: '文件上传', link: 'admin/upload' },
+          ],
+        },
+        { text: 'Quant 模块',
+          items: [
+            { text: '股票管理', link: 'quant/stock' },
+            { text: '行业管理', link: 'quant/industry' },
+            { text: '概念管理', link: 'quant/concept' },
+            { text: '行业历史', link: 'quant/industry-log' },
+            { text: '概念历史', link: 'quant/concept-log' },
+            { text: 'K线数据', link: 'quant/stock-kline' },
+          ],
+        },
+        { text: '错误码说明', link: 'error-codes' },
+      ],
+    },
+    '/deploy/': {
+      base: '/deploy/',
+      items: [
+        { text: '部署概览', link: 'index' },
+        { text: '环境准备', link: 'environment' },
+        { text: '后端部署',
+          items: [
+            { text: '后端部署', link: 'backend/deploy' },
+            { text: 'Docker 部署', link: 'backend/docker' },
+            { text: 'Celery 部署', link: 'backend/celery' },
+          ],
+        },
+        { text: '前端部署',
+          items: [
+            { text: '前端构建', link: 'frontend/build' },
+            { text: 'Nginx 配置', link: 'frontend/nginx' },
+          ],
+        },
+        { text: '数据库',
+          items: [
+            { text: '数据库迁移', link: 'database/migration' },
+            { text: '数据备份', link: 'database/backup' },
+          ],
+        },
+        { text: '监控运维',
+          items: [
+            { text: '日志管理', link: 'monitoring/logs' },
+            { text: 'Celery 监控', link: 'monitoring/flower' },
+            { text: '性能优化', link: 'monitoring/performance' },
+          ],
+        },
+        { text: '常见问题', link: 'troubleshooting' },
+      ],
+    },
+    '/faq/': {
+      base: '/faq/',
+      items: [
+        { text: 'FAQ 概览', link: 'index' },
+        { text: '开发问题',
+          items: [
+            { text: '后端问题', link: 'development/backend' },
+            { text: '前端问题', link: 'development/frontend' },
+          ],
+        },
+        { text: '部署问题', link: 'deployment' },
+        { text: '业务问题', link: 'business' },
+        { text: '最佳实践',
+          items: [
+            { text: '代码规范', link: 'best-practices/code-style' },
+            { text: '安全建议', link: 'best-practices/security' },
+            { text: '性能优化', link: 'best-practices/performance' },
+            { text: '测试指南', link: 'best-practices/testing' },
+          ],
+        },
+      ],
+    },
   };
 }

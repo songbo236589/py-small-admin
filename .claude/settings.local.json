@@ -1,9 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(tree:*)",
-      "Bash(dir \"d:\\\\python\\\\project\\\\py-small-admin\\\\dosc\" /B /A:D)",
-      "Bash(ls:*)"
+      "Bash(find:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker volume inspect:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose ps:*)"
     ]
   }
 }
