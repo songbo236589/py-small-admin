@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(dir \"d:\\\\python\\\\project\\\\py-small-admin\\\\dosc\" /B /A:D)",
+      "Bash(ls:*)"
+    ]
+  }
+}
