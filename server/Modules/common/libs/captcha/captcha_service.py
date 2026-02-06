@@ -93,6 +93,7 @@ class CaptchaService:
             image_data=image_data,
             expire_seconds=self._config.expire_seconds,
             metadata={"length": len(text)},
+            font_size=self._config.font_size,
         )
 
     async def _generate_math_captcha(self, captcha_id: str) -> CaptchaResult:
@@ -117,6 +118,7 @@ class CaptchaService:
             # answer=answer,  # 仅用于调试，实际使用时不应该返回答案
             expire_seconds=self._config.expire_seconds,
             metadata={"question_type": "math", "format": "image"},
+            font_size=self._config.font_size,
         )
 
     async def verify_captcha(self, captcha_id: str, answer: str) -> bool:

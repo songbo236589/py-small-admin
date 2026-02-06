@@ -106,6 +106,7 @@ class CeleryService:
             result_extended=self._config.result_extended,
             result_backend_transport_options=self._config.result_backend_transport_options,
             # ========== Worker 配置 ==========
+            # worker_pool=self._config.worker_pool,
             worker_concurrency=self._config.worker_concurrency,
             worker_prefetch_multiplier=self._config.worker_prefetch_multiplier,
             worker_max_tasks_per_child=self._config.worker_max_tasks_per_child,

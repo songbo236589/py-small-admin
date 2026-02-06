@@ -33,7 +33,15 @@ class QuantStockService(BaseService):
 
     def _clean_nan_values(self, data: dict[str, Any]) -> dict[str, Any]:
         """
-        清理字典中的 nan 值，将其转换为 None
+        清理字典中的无效值，将其转换为 None
+
+        处理以下无效值：
+        - nan 值（float）
+        - inf 值（float）
+        - 空字符串 "-"
+        - 空字符串 "--"
+        - 空字符串 ""
+        - 其他非数值的字符串
 
         Args:
             data: 待清理的字典
@@ -43,12 +51,98 @@ class QuantStockService(BaseService):
         """
         cleaned_data = {}
         for key, value in data.items():
-            # 检查是否为 nan 值
+            # 跳过非数据字段（如 code, name 等）
+            if key in ["code", "name"]:
+                cleaned_data[key] = value
+                continue
+
+            # 处理 None 值
+            if value is None:
+                cleaned_data[key] = None
+                continue
+
+            # 处理 nan 值
             if isinstance(value, float) and math.isnan(value):
                 cleaned_data[key] = None
+                continue
+
+            # 处理 inf 值
+            if isinstance(value, float) and math.isinf(value):
+                cleaned_data[key] = None
+                continue
+
+            # 处理字符串类型的无效值
+            if isinstance(value, str):
+                # 空字符串或特殊标记
+                if value in ["-", "--", "", "N/A", "NA", "null"]:
+                    cleaned_data[key] = None
+                    continue
+
+                # 尝试转换为数字（如果看起来像数字）
+                try:
+                    if "." in value or "," in value:
+                        # 可能是小数
+                        num_value = float(value.replace(",", ""))
+                        cleaned_data[key] = num_value
+                    else:
+                        # 可能是整数
+                        cleaned_data[key] = int(value)
+                except (ValueError, TypeError):
+                    # 不是数字，保持原样
+                    cleaned_data[key] = value
             else:
+                # 其他类型（int, float 等）保持原样
                 cleaned_data[key] = value
+
         return cleaned_data
+
+    def _safe_decimal_convert(self, value: Any) -> Any:
+        """
+        安全地将值转换为 Decimal 或保持原样
+
+        对于 float 类型，先转换为字符串再转为 Decimal，避免精度问题
+        对于字符串类型，尝试转换为 Decimal
+        其他类型保持原样
+
+        Args:
+            value: 待转换的值
+
+        Returns:
+            转换后的值或 None
+        """
+        from decimal import Decimal, InvalidOperation
+
+        if value is None:
+            return None
+
+        # 如果已经是 Decimal，直接返回
+        if isinstance(value, Decimal):
+            return value
+
+        # 处理 float 类型（通过字符串避免精度问题）
+        if isinstance(value, float):
+            try:
+                return Decimal(str(value))
+            except (ValueError, InvalidOperation):
+                return None
+
+        # 处理字符串类型
+        if isinstance(value, str):
+            # 清理字符串中的逗号和空格
+            cleaned = value.replace(",", "").strip()
+            if not cleaned or cleaned in ["-", "--", "", "N/A"]:
+                return None
+            try:
+                return Decimal(cleaned)
+            except (ValueError, InvalidOperation):
+                return None
+
+        # 处理 int 类型
+        if isinstance(value, int):
+            return Decimal(value)
+
+        # 其他类型保持原样
+        return value
 
     async def index(self, data: dict[str, Any]) -> JSONResponse:
         """
@@ -575,11 +669,9 @@ class QuantStockService(BaseService):
         """
         处理A股股票数据
 
-        A股数据来源：stock_zh_a_spot_em
-        A股数据字段：23个字段，包含完整的交易指标和财务估值数据
-        ['序号', '代码', '名称', '最新价', '涨跌幅', '涨跌额', '成交量', '成交额',
-         '振幅', '最高', '最低', '今开', '昨收', ' 量比', '换手率', '市盈率-动态',
-         '市净率', '总市值', '流通市值', '涨速', '5分钟涨跌', '60日涨跌幅', '年初至今涨跌幅']
+        A股数据来源：stock_zh_a_spot
+        A股数据字段：包含完整的交易指标数据
+        代码格式可能带前缀：sh600000, sz000001, bj920000 等
 
         Args:
             df: A股股票数据DataFrame
@@ -587,88 +679,132 @@ class QuantStockService(BaseService):
         Returns:
             list[dict[str, Any]]: 处理后的股票数据列表
         """
+        from loguru import logger
+
         stock_list = []
+        skipped_count = 0
+
         for _, row in df.iterrows():
-            code = row["代码"]
-            name = row["名称"]
+            try:
+                code = str(row["代码"]).strip()
+                name = str(row["名称"]).strip()
 
-            # 根据股票代码前缀判断市场类型
-            # 沪市主板：600 / 601 / 603 / 605
-            # 深市主板：000 / 001 / 002 / 003
-            # 创业板：  300 / 301
-            # 科创板：  688
-            # 北交所：  43 / 83 / 87 / 88
-            if code.startswith(("600", "601", "603", "605", "688")):
-                stock_market = 1  # 上海（主板 + 科创板）
-                exchange = 1  # 上海证券交易所(SSE)
-            elif code.startswith(("000", "001", "002", "003", "300", "301")):
-                stock_market = 2  # 深圳（主板 + 创业板）
-                exchange = 2  # 深圳证券交易所(SZSE)
-            elif code.startswith(("43", "83", "87", "88")):
-                stock_market = 3  # 北交所
-                exchange = 3  # 北京证券交易所(BSE)
-            else:
-                continue  # 跳过其他代码格式的股票
+                # 解析代码前缀和数字部分
+                # 支持格式：bj920000, sh600000, sz000001, 600000 等
+                code_prefix = ""
+                code_number = code
 
-            # 判断股票类型
-            if code.startswith(
-                ("600", "601", "603", "605", "000", "001", "002", "003")
-            ):
-                stock_type = 1  # 主板
-            elif code.startswith(("300", "301")):
-                stock_type = 2  # 创业板
-            elif code.startswith("688"):
-                stock_type = 3  # 科创板
-            elif code.startswith(("43", "83", "87", "88")):
-                stock_type = 4  # 北交所
-            else:
+                # 提取前缀（如果有）
+                if len(code) > 6 and code[:2].isalpha():
+                    code_prefix = code[:2].lower()
+                    code_number = code[2:]
+
+                # 验证代码是否为纯数字
+                if not code_number.isdigit():
+                    skipped_count += 1
+                    logger.debug(f"跳过非数字代码: {code}")
+                    continue
+
+                # 根据前缀或代码判断市场类型
+                stock_market = None
+                exchange = None
+
+                # 优先使用前缀判断
+                if code_prefix == "sh":
+                    stock_market = 1  # 上海
+                    exchange = 1  # 上海证券交易所(SSE)
+                elif code_prefix == "sz":
+                    stock_market = 2  # 深圳
+                    exchange = 2  # 深圳证券交易所(SZSE)
+                elif code_prefix == "bj":
+                    stock_market = 3  # 北交所
+                    exchange = 3  # 北京证券交易所(BSE)
+                else:
+                    # 没有前缀，根据代码数字判断
+                    if code_number.startswith(("600", "601", "603", "605", "688")):
+                        stock_market = 1
+                        exchange = 1
+                    elif code_number.startswith(
+                        ("000", "001", "002", "003", "300", "301")
+                    ):
+                        stock_market = 2
+                        exchange = 2
+                    elif code_number.startswith(("43", "83", "87", "88", "92")):
+                        stock_market = 3
+                        exchange = 3
+                    else:
+                        skipped_count += 1
+                        logger.debug(f"跳过未知代码格式: {code}")
+                        continue
+
+                # 判断股票类型（使用纯数字代码）
                 stock_type = None
+                if code_number.startswith(
+                    ("600", "601", "603", "605", "000", "001", "002", "003")
+                ):
+                    stock_type = 1  # 主板
+                elif code_number.startswith(("300", "301")):
+                    stock_type = 2  # 创业板
+                elif code_number.startswith("688"):
+                    stock_type = 3  # 科创板
+                elif code_number.startswith(("43", "83", "87", "88", "92")):
+                    stock_type = 4  # 北交所
 
-            # 判断交易状态（根据最新价判断）
-            latest_price = row.get("最新价")
-            if latest_price is None or latest_price == "" or latest_price == "-":
-                trade_status = 0  # 停牌
-            else:
-                trade_status = 1  # 正常交易
+                # 判断交易状态（根据最新价判断）
+                latest_price = row.get("最新价")
+                if latest_price is None or latest_price == "" or latest_price == "-":
+                    trade_status = 0  # 停牌
+                else:
+                    trade_status = 1  # 正常交易
 
-            # 判断是否为ST股（根据股票名称判断）
-            is_st = 1 if "ST" in name else 0
+                # 判断是否为ST股（根据股票名称判断）
+                is_st = 1 if "ST" in name else 0
 
-            # 提取完整信息
-            stock_data = {
-                "code": code,
-                "name": name,
-                "market": stock_market,
-                "exchange": exchange,
-                "stock_type": stock_type,
-                # 状态字段
-                "trade_status": trade_status,
-                "is_st": is_st,
-                # 价格行情字段
-                "latest_price": row.get("最新价"),
-                "open_price": row.get("今开"),
-                "close_price": row.get("昨收"),
-                "high_price": row.get("最高"),
-                "low_price": row.get("最低"),
-                "change_percent": row.get("涨跌幅"),
-                "change_amount": row.get("涨跌额"),
-                "change_speed": row.get("涨速"),
-                # 交易指标字段
-                "volume": row.get("成交量"),
-                "amount": row.get("成交额"),
-                "volume_ratio": row.get("量比"),
-                "turnover_rate": row.get("换手率"),
-                "amplitude": row.get("振幅"),
-                "change_5min": row.get("5分钟涨跌"),
-                "change_60day": row.get("60日涨跌幅"),
-                "change_ytd": row.get("年初至今涨跌幅"),
-                # 财务与估值字段
-                "pe_ratio": row.get("市盈率-动态"),
-                "pb_ratio": row.get("市净率"),
-                "total_market_cap": row.get("总市值"),
-                "circulating_market_cap": row.get("流通市值"),
-            }
-            stock_list.append(stock_data)
+                # 提取完整信息（只使用纯数字代码，不带英文前缀）
+                stock_data = {
+                    "code": code_number,  # 只保留纯数字代码（如：920000、600000、000001）
+                    "name": name,
+                    "market": stock_market,
+                    "exchange": exchange,
+                    "stock_type": stock_type,
+                    # 状态字段
+                    "trade_status": trade_status,
+                    "is_st": is_st,
+                    # 价格行情字段
+                    "latest_price": row.get("最新价"),
+                    "open_price": row.get("今开"),
+                    "close_price": row.get("昨收"),
+                    "high_price": row.get("最高"),
+                    "low_price": row.get("最低"),
+                    "change_percent": row.get("涨跌幅"),
+                    "change_amount": row.get("涨跌额"),
+                    "change_speed": None,
+                    # 交易指标字段
+                    "volume": row.get("成交量"),
+                    "amount": row.get("成交额"),
+                    "volume_ratio": None,
+                    "turnover_rate": None,
+                    "amplitude": None,
+                    "change_5min": None,
+                    "change_60day": None,
+                    "change_ytd": None,
+                    # 财务与估值字段
+                    "pe_ratio": None,
+                    "pb_ratio": None,
+                    "total_market_cap": None,
+                    "circulating_market_cap": None,
+                }
+                stock_list.append(stock_data)
+
+            except Exception as e:
+                skipped_count += 1
+                logger.error(
+                    f"处理股票数据失败 (代码: {row.get('代码', 'unknown')}): {e}"
+                )
+
+        # 记录跳过的数据统计
+        if skipped_count > 0:
+            logger.info(f"_process_a_stock_data 跳过了 {skipped_count} 条无效数据")
 
         return stock_list
 
@@ -871,6 +1007,10 @@ class QuantStockService(BaseService):
         Returns:
             JSONResponse: 同步结果统计
         """
+        from traceback import format_exc
+
+        from loguru import logger
+
         try:
             # 根据市场类型获取股票列表
             if market == 1 or market == 2 or market == 3:
@@ -885,6 +1025,8 @@ class QuantStockService(BaseService):
             if df.empty:
                 return error("未获取到股票数据")
 
+            logger.info(f"获取到 {len(df)} 条股票原始数据")
+
             # 根据市场类型处理数据
             if market == 4:
                 stock_list = self._process_hk_stock_data(df)
@@ -893,112 +1035,187 @@ class QuantStockService(BaseService):
             else:
                 stock_list = self._process_a_stock_data(df)
 
+            logger.info(f"处理后得到 {len(stock_list)} 条有效股票数据")
+
             # 批量插入或更新数据库
             async with get_async_session() as session:
                 added_count = 0
                 updated_count = 0
+                error_count = 0
+                error_details = []
 
                 for stock_data in stock_list:
-                    stock_code = stock_data.get("code")
+                    try:
+                        stock_code = stock_data.get("code")
 
-                    # 检查是否存在
-                    existing = await session.execute(
-                        select(QuantStock).where(QuantStock.stock_code == stock_code)
-                    )
-                    existing_stock = existing.scalar_one_or_none()
-                    # 清理 nan 值
-                    cleaned_data = self._clean_nan_values(stock_data)
-                    if existing_stock:
-                        # 更新基础信息
-                        existing_stock.stock_name = cleaned_data.get("name")
-                        existing_stock.stock_type = cleaned_data.get("stock_type")
-                        existing_stock.exchange = cleaned_data.get("exchange")
-                        # 状态字段
-                        existing_stock.trade_status = cleaned_data.get("trade_status")
-                        existing_stock.is_st = cleaned_data.get("is_st")
-                        # 价格行情字段
-                        existing_stock.latest_price = cleaned_data.get("latest_price")
-                        existing_stock.open_price = cleaned_data.get("open_price")
-                        existing_stock.close_price = cleaned_data.get("close_price")
-                        existing_stock.high_price = cleaned_data.get("high_price")
-                        existing_stock.low_price = cleaned_data.get("low_price")
-                        existing_stock.change_percent = cleaned_data.get(
-                            "change_percent"
+                        # 清理无效值
+                        cleaned_data = self._clean_nan_values(stock_data)
+
+                        # 安全地转换 Decimal 类型
+                        for key in [
+                            "latest_price",
+                            "open_price",
+                            "close_price",
+                            "high_price",
+                            "low_price",
+                            "change_percent",
+                            "change_amount",
+                            "change_speed",
+                            "volume",
+                            "amount",
+                            "volume_ratio",
+                            "turnover_rate",
+                            "amplitude",
+                            "change_5min",
+                            "change_60day",
+                            "change_ytd",
+                            "pe_ratio",
+                            "pb_ratio",
+                            "total_market_cap",
+                            "circulating_market_cap",
+                        ]:
+                            if key in cleaned_data:
+                                cleaned_data[key] = self._safe_decimal_convert(
+                                    cleaned_data[key]
+                                )
+
+                        # 检查是否存在
+                        existing = await session.execute(
+                            select(QuantStock).where(
+                                QuantStock.stock_code == stock_code
+                            )
                         )
-                        existing_stock.change_amount = cleaned_data.get("change_amount")
-                        existing_stock.change_speed = cleaned_data.get("change_speed")
-                        # 交易指标字段
-                        existing_stock.volume = cleaned_data.get("volume")
-                        existing_stock.amount = cleaned_data.get("amount")
-                        existing_stock.volume_ratio = cleaned_data.get("volume_ratio")
-                        existing_stock.turnover_rate = cleaned_data.get("turnover_rate")
-                        existing_stock.amplitude = cleaned_data.get("amplitude")
-                        existing_stock.change_5min = cleaned_data.get("change_5min")
-                        existing_stock.change_60day = cleaned_data.get("change_60day")
-                        existing_stock.change_ytd = cleaned_data.get("change_ytd")
-                        # 财务与估值字段
-                        existing_stock.pe_ratio = cleaned_data.get("pe_ratio")
-                        existing_stock.pb_ratio = cleaned_data.get("pb_ratio")
-                        existing_stock.total_market_cap = cleaned_data.get(
-                            "total_market_cap"
-                        )
-                        existing_stock.circulating_market_cap = cleaned_data.get(
-                            "circulating_market_cap"
-                        )
-                        existing_stock.updated_at = now()
-                        updated_count += 1
-                    else:
-                        # 插入完整信息
-                        stock = QuantStock(
-                            stock_code=cleaned_data["code"],
-                            stock_name=cleaned_data["name"],
-                            market=cleaned_data["market"],
-                            exchange=cleaned_data["exchange"],
-                            stock_type=cleaned_data["stock_type"],
+                        existing_stock = existing.scalar_one_or_none()
+
+                        if existing_stock:
+                            # 更新基础信息
+                            existing_stock.stock_name = cleaned_data.get("name")
+                            existing_stock.stock_type = cleaned_data.get("stock_type")
+                            existing_stock.exchange = cleaned_data.get("exchange")
                             # 状态字段
-                            list_status=1,
-                            trade_status=cleaned_data.get("trade_status"),
-                            is_st=cleaned_data.get("is_st"),
-                            status=1,
+                            existing_stock.trade_status = cleaned_data.get(
+                                "trade_status"
+                            )
+                            existing_stock.is_st = cleaned_data.get("is_st")
                             # 价格行情字段
-                            latest_price=cleaned_data.get("latest_price"),
-                            open_price=cleaned_data.get("open_price"),
-                            close_price=cleaned_data.get("close_price"),
-                            high_price=cleaned_data.get("high_price"),
-                            low_price=cleaned_data.get("low_price"),
-                            change_percent=cleaned_data.get("change_percent"),
-                            change_amount=cleaned_data.get("change_amount"),
-                            change_speed=cleaned_data.get("change_speed"),
+                            existing_stock.latest_price = cleaned_data.get(
+                                "latest_price"
+                            )
+                            existing_stock.open_price = cleaned_data.get("open_price")
+                            existing_stock.close_price = cleaned_data.get("close_price")
+                            existing_stock.high_price = cleaned_data.get("high_price")
+                            existing_stock.low_price = cleaned_data.get("low_price")
+                            existing_stock.change_percent = cleaned_data.get(
+                                "change_percent"
+                            )
+                            existing_stock.change_amount = cleaned_data.get(
+                                "change_amount"
+                            )
+                            existing_stock.change_speed = cleaned_data.get(
+                                "change_speed"
+                            )
                             # 交易指标字段
-                            volume=cleaned_data.get("volume"),
-                            amount=cleaned_data.get("amount"),
-                            volume_ratio=cleaned_data.get("volume_ratio"),
-                            turnover_rate=cleaned_data.get("turnover_rate"),
-                            amplitude=cleaned_data.get("amplitude"),
-                            change_5min=cleaned_data.get("change_5min"),
-                            change_60day=cleaned_data.get("change_60day"),
-                            change_ytd=cleaned_data.get("change_ytd"),
+                            existing_stock.volume = cleaned_data.get("volume")
+                            existing_stock.amount = cleaned_data.get("amount")
+                            existing_stock.volume_ratio = cleaned_data.get(
+                                "volume_ratio"
+                            )
+                            existing_stock.turnover_rate = cleaned_data.get(
+                                "turnover_rate"
+                            )
+                            existing_stock.amplitude = cleaned_data.get("amplitude")
+                            existing_stock.change_5min = cleaned_data.get("change_5min")
+                            existing_stock.change_60day = cleaned_data.get(
+                                "change_60day"
+                            )
+                            existing_stock.change_ytd = cleaned_data.get("change_ytd")
                             # 财务与估值字段
-                            pe_ratio=cleaned_data.get("pe_ratio"),
-                            pb_ratio=cleaned_data.get("pb_ratio"),
-                            total_market_cap=cleaned_data.get("total_market_cap"),
-                            circulating_market_cap=cleaned_data.get(
+                            existing_stock.pe_ratio = cleaned_data.get("pe_ratio")
+                            existing_stock.pb_ratio = cleaned_data.get("pb_ratio")
+                            existing_stock.total_market_cap = cleaned_data.get(
+                                "total_market_cap"
+                            )
+                            existing_stock.circulating_market_cap = cleaned_data.get(
                                 "circulating_market_cap"
-                            ),
-                            created_at=now(),
+                            )
+                            existing_stock.updated_at = now()
+                            updated_count += 1
+                        else:
+                            # 插入完整信息
+                            stock = QuantStock(
+                                stock_code=cleaned_data["code"],
+                                stock_name=cleaned_data["name"],
+                                market=cleaned_data["market"],
+                                exchange=cleaned_data["exchange"],
+                                stock_type=cleaned_data["stock_type"],
+                                # 状态字段
+                                list_status=1,
+                                trade_status=cleaned_data.get("trade_status"),
+                                is_st=cleaned_data.get("is_st"),
+                                status=1,
+                                # 价格行情字段
+                                latest_price=cleaned_data.get("latest_price"),
+                                open_price=cleaned_data.get("open_price"),
+                                close_price=cleaned_data.get("close_price"),
+                                high_price=cleaned_data.get("high_price"),
+                                low_price=cleaned_data.get("low_price"),
+                                change_percent=cleaned_data.get("change_percent"),
+                                change_amount=cleaned_data.get("change_amount"),
+                                change_speed=cleaned_data.get("change_speed"),
+                                # 交易指标字段
+                                volume=cleaned_data.get("volume"),
+                                amount=cleaned_data.get("amount"),
+                                volume_ratio=cleaned_data.get("volume_ratio"),
+                                turnover_rate=cleaned_data.get("turnover_rate"),
+                                amplitude=cleaned_data.get("amplitude"),
+                                change_5min=cleaned_data.get("change_5min"),
+                                change_60day=cleaned_data.get("change_60day"),
+                                change_ytd=cleaned_data.get("change_ytd"),
+                                # 财务与估值字段
+                                pe_ratio=cleaned_data.get("pe_ratio"),
+                                pb_ratio=cleaned_data.get("pb_ratio"),
+                                total_market_cap=cleaned_data.get("total_market_cap"),
+                                circulating_market_cap=cleaned_data.get(
+                                    "circulating_market_cap"
+                                ),
+                                created_at=now(),
+                            )
+                            session.add(stock)
+                            added_count += 1
+
+                    except Exception as e:
+                        error_count += 1
+                        error_msg = (
+                            f"代码 {stock_data.get('code', 'unknown')}: {str(e)}"
                         )
-                        session.add(stock)
-                        added_count += 1
+                        error_details.append(error_msg)
+                        logger.error(f"处理股票数据失败: {error_msg}\n{format_exc()}")
+                        # 继续处理下一条数据，不中断整个流程
 
                 await session.commit()
+
+            # 构建结果消息
+            message_parts = [
+                f"同步完成，新增 {added_count} 条，更新 {updated_count} 条。"
+            ]
+            if error_count > 0:
+                message_parts.append(f" 失败 {error_count} 条。")
+                if len(error_details) <= 5:
+                    message_parts.append(f" 错误详情: {'; '.join(error_details)}")
+                else:
+                    message_parts.append(
+                        f" 错误详情: {'; '.join(error_details[:5])}... (共 {error_count} 条错误)"
+                    )
 
             return success(
                 {
                     "added": added_count,
                     "updated": updated_count,
+                    "failed": error_count,
                     "total": len(stock_list),
                 },
-                message=f"同步完成，新增 {added_count} 条，更新 {updated_count} 条。",
+                message="".join(message_parts),
             )
         except Exception as e:
+            logger.error(f"同步股票列表失败: {str(e)}\n{format_exc()}")
             return error(f"同步失败: {str(e)}")

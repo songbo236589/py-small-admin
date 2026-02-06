@@ -152,13 +152,31 @@ EXIT;
 执行数据库迁移，创建数据表：
 
 ```bash
-alembic upgrade head
+python -m commands.migrate up
 ```
 
-或者使用命令行工具：
+这将升级所有模块到最新版本。如果只想升级指定模块：
 
 ```bash
-python commands/migrate.py upgrade head
+python -m commands.migrate up --module admin
+```
+
+**查看迁移状态**：
+
+```bash
+python -m commands.migrate list
+```
+
+输出示例：
+
+```
+发现的模块:
+------------------------------------------------------------
+模块名称              迁移状态         当前版本        版本表
+------------------------------------------------------------
+admin                 已初始化         abc12345        fa_admin_alembic_versions
+system                已初始化         def67890        fa_system_alembic_versions
+------------------------------------------------------------
 ```
 
 ### 8. 填充初始数据（可选）
@@ -166,7 +184,19 @@ python commands/migrate.py upgrade head
 填充初始管理员数据和菜单数据：
 
 ```bash
-python commands/seed.py
+python -m commands.seed run-all
+```
+
+这将运行所有模块的种子数据。如果只想填充指定模块：
+
+```bash
+python -m commands.seed run --module admin
+```
+
+**查看种子数据状态**：
+
+```bash
+python -m commands.seed list
 ```
 
 初始管理员账号：
@@ -174,6 +204,10 @@ python commands/seed.py
 - 密码：`admin123`
 
 **注意**：生产环境请立即修改初始密码！
+
+更多详细用法请参考：
+- [数据库迁移使用文档](../../server/docs/数据库迁移使用文档.md)
+- [数据库填充使用文档](../../server/docs/数据库填充使用文档.md)
 
 ## 前端安装
 

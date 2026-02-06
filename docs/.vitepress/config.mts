@@ -153,6 +153,17 @@ function createSidebar() {
           ],
         },
         {
+          text: '命令行工具',
+          items: [
+            { text: '工具概览', link: 'cli-commands/' },
+            { text: '数据库迁移', link: 'cli-commands/migrate' },
+            { text: '数据库填充', link: 'cli-commands/seed' },
+            { text: 'Celery 管理', link: 'cli-commands/celery-manager' },
+            { text: '模块创建', link: 'cli-commands/create-module' },
+            { text: '密钥生成', link: 'cli-commands/generate-keys' },
+          ],
+        },
+        {
           text: '后端开发',
           items: [
             { text: '开发环境搭建', link: 'backend/' },
@@ -161,6 +172,7 @@ function createSidebar() {
             { text: '数据库设计',
               items: [
                 { text: '数据库概览', link: 'backend/database/' },
+                { text: '模型定义', link: 'backend/database/models' },
                 { text: 'Admin 模块表结构', link: 'backend/database/admin-models' },
                 { text: 'Quant 模块表结构', link: 'backend/database/quant-models' },
                 { text: '数据库迁移', link: 'backend/database/migrations' },
@@ -277,6 +289,7 @@ function createSidebar() {
       items: [
         { text: '部署概览', link: 'index' },
         { text: '环境准备', link: 'environment' },
+        { text: '环境变量配置', link: 'env-config' },
         { text: '后端部署',
           items: [
             { text: '后端部署', link: 'backend/deploy' },

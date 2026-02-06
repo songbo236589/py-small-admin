@@ -1,15 +1,21 @@
 import akshare as ak
 
+print("AkShare版本：", ak.__version__)
 # 直接测试（不使用异步）
-df = ak.stock_zh_a_hist(
-    symbol="600519",
-    period="daily",
-    adjust="qfq",
-    start_date="20000101",
-    end_date="20250101",
-)
-print(f"获取到 {len(df)} 条记录")
+# df = ak.stock_zh_a_hist(
+#     symbol="600519",
+#     period="daily",
+#     adjust="qfq",
+#     start_date="20000101",
+#     end_date="20250101",
+# )
+# print(df)
 
+# df = ak.stock_zh_a_spot()
+
+# print(f"获取到 {len(df)} 条记录")
+# print(df.columns)
+# print(df)
 
 # import akshare as ak
 

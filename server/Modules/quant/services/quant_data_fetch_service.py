@@ -23,7 +23,9 @@ class QuantDataFetchService:
         """
         try:
             logger.info("开始获取A股股票实时行情列表")
-            df = await asyncio.to_thread(ak.stock_zh_a_spot_em)
+            # df = await asyncio.to_thread(ak.stock_zh_a_spot_em)
+            df = await asyncio.to_thread(ak.stock_zh_a_spot)
+
             logger.info(f"成功获取A股股票实时行情列表，共 {len(df)} 条记录")
             return df
         except Exception as e:

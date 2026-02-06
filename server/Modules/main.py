@@ -12,6 +12,7 @@ from Modules.common.libs.app import lifespan
 from Modules.common.libs.config import Config, ConfigRegistry
 from Modules.common.libs.exception import register_exception_handlers
 from Modules.common.libs.responses.response import success
+from Modules.content.routes import main_router as content_router
 from Modules.quant.routes import main_router as quant_router
 
 # 应用启动时加载一次
@@ -72,6 +73,7 @@ async def root():
         {
             "name": Config.get("app.name"),
             "description": Config.get("app.description"),
+            "font_size": Config.get("captcha.font_size"),
         },
         message="项目介绍",
     )
@@ -118,3 +120,4 @@ register_exception_handlers(app)
 
 app.include_router(admin_router, prefix=Config.get("app.api_prefix", ""))
 app.include_router(quant_router, prefix=Config.get("app.api_prefix", ""))
+app.include_router(content_router, prefix=Config.get("app.api_prefix", ""))

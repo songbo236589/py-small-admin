@@ -11,7 +11,9 @@
  * @doc https://umijs.org/docs/guides/routes
  */
 import Admin from './admin';
+import Content from './content';
 import Quant from './quant';
+
 export default [
   {
     path: '/login',
@@ -26,6 +28,7 @@ export default [
   },
   ...Admin,
   ...Quant,
+  ...Content,
   {
     path: '*',
     layout: false,

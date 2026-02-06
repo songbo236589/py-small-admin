@@ -772,7 +772,7 @@ async def get_admin_group(group_id: int):
 username = "admin"
 
 # ❌ 坏的注释：过时的信息
-# TODO: 修复这个问题（已经在 v2.0 中修复）
+# 这个问题已在 v2.0 中修复
 ```
 
 ## 代码审查清单

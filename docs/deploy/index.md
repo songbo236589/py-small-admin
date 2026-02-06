@@ -281,7 +281,9 @@ cp .env.example .env
 vim .env
 ```
 
-修改以下配置：
+详细的配置说明请参考：[环境变量配置详解](./env-config.md)
+
+主要配置项：
 
 ```bash
 # 生产环境配置

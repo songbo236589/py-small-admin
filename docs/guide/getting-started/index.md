@@ -187,6 +187,105 @@ python --version
 pip list
 ```
 
+### pip 常用命令
+
+**查看包信息**：
+
+```cmd
+# 查看某个包的详细信息（包括版本）
+pip show akshare
+
+# 查看 PyPI 上包的所有可用版本（pip 21.2+）
+pip index versions akshare
+
+# 查看所有已安装的包
+pip list
+
+# 查看所有已安装的包（带版本号格式）
+pip list --format=columns
+
+# 查看过时的包（可升级的包）
+pip list --outdated
+```
+
+**安装/卸载包**：
+
+```cmd
+# 安装包
+pip install akshare
+
+# 安装指定版本的包
+pip install akshare==1.14.0
+
+# 安装最小版本
+pip install akshare>=1.14.0
+
+# 升级包到最新版本
+pip install --upgrade akshare
+
+# 卸载包
+pip uninstall akshare
+
+# 批量安装（从 requirements.txt）
+pip install -r requirements.txt
+```
+
+**导出依赖**：
+
+```cmd
+# 导出所有已安装的包到 requirements.txt
+pip freeze > requirements.txt
+
+# 导出当前项目使用的包（需要安装 pipreqs）
+pip install pipreqs
+pipreqs . --force
+```
+
+**缓存管理**：
+
+```cmd
+# 查看 pip 缓存目录
+pip cache info
+
+# 清理 pip 缓存
+pip cache purge
+
+# 列出缓存中的包
+pip cache list
+```
+
+**配置管理**：
+
+```cmd
+# 查看当前配置
+pip config list
+
+# 查看全局配置文件位置
+pip config debug
+
+# 设置全局镜像源
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 设置可信主机（解决 SSL 证书问题）
+pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+```
+
+**检查和验证**：
+
+```cmd
+# 检查包的依赖关系
+pip check
+
+# 验证已安装的包是否有损坏的文件
+pip verify
+
+# 查看 pip 版本
+pip --version
+
+# 升级 pip 自身
+python -m pip install --upgrade pip
+```
+
 ## Node.js 环境安装
 
 推荐使用 **nvm** (Node Version Manager) 管理 Node.js 版本，可以轻松安装和切换不同版本的 Node.js。
@@ -1221,20 +1320,21 @@ cp .env.example .env
 # 3. 准备应用配置
 cd ..
 cp .env.example .env
-# 修改应用配置，特别是 Docker 环境的主机名：
-# - DB_CONNECTIONS__MYSQL__HOST=mysql
-# - DB_REDIS__DEFAULT__HOST=redis
-# - CELERY_BROKER_URL 中的主机改为 rabbitmq
+# 注意：.env.example 中已配置好 Docker 环境所需的服务名
+# - CELERY_BROKER_URL 使用 rabbitmq 服务名
+# - CELERY_RESULT_BACKEND 使用 redis 服务名
+# 如需自定义，请修改以上配置
 
 # 4. 启动所有服务
 cd docker
 docker-compose up -d
 
-# 5. 查看服务状态
-docker-compose ps
+# 5. 等待 MySQL 初始化完成（约 3-5 分钟）
+# 查看 MySQL 日志确认初始化进度
+docker-compose logs -f mysql
 
-# 6. 查看服务日志
-docker-compose logs -f
+# 6. 查看所有服务状态
+docker-compose ps
 ```
 
 ### 服务访问
@@ -1342,6 +1442,50 @@ cp .env.example .env.test
 #   HOST_PORT_MYSQL=3307
 #   HOST_PORT_FASTAPI=8010
 docker-compose -p test -f docker-compose.yml --env-file .env.test up -d
+```
+
+### 常见问题
+
+**Q: 容器名称是 docker 而不是 py-small-admin？**
+
+A: 首次启动时 docker-compose 使用目录名作为项目名。docker-compose.yml 已配置 `name` 字段，重建后即可使用正确名称：
+```bash
+docker-compose down
+docker-compose up -d
+```
+
+**Q: Celery Worker 无法连接 RabbitMQ，提示 Connection refused？**
+
+A: 确保 server/.env 中的配置使用了 Docker 服务名（不是 localhost）：
+```bash
+# 正确配置
+CELERY_BROKER_URL="amqp://admin:admin123@rabbitmq:5672//"
+CELERY_RESULT_BACKEND="redis://default:redis123456@redis:6379/0"
+```
+
+**Q: 数据库工具报错 1251 - Client does not support authentication protocol？**
+
+A: MySQL 8.0 首次初始化使用新的认证协议。需要删除旧数据卷重新初始化：
+```bash
+docker-compose down -v
+docker-compose up -d
+```
+
+**Q: MySQL 容器一直 unhealthy 或重启？**
+
+A: MySQL 首次初始化需要 3-5 分钟，请耐心等待。查看初始化进度：
+```bash
+docker-compose logs -f mysql
+```
+当看到 "ready for connections" 时表示初始化完成。
+
+**Q: 修改代码后容器中没有生效？**
+
+A: 需要重新构建镜像：
+```bash
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
 ## Git 环境安装

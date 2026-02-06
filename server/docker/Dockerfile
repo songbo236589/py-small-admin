@@ -70,13 +70,24 @@ EXPOSE 8009 5555
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8009/ || exit 1
 
+# ========================================
 # 启动命令（根据 SERVICE_TYPE 启动不同服务）
+# ========================================
+# 支持的服务类型:
+#   - fastapi: FastAPI Web 服务
+#   - celery-worker: Celery Worker (admin 队列)
+#   - celery-worker-quant: Celery Worker (quant 队列)
+#   - celery-beat: Celery Beat 定时任务调度器
+#   - flower: Celery 监控服务
+# ========================================
 CMD if [ "$SERVICE_TYPE" = "celery-worker" ]; then \
-        celery -A Modules.common.libs.celery.celery_service worker --loglevel=info; \
+    celery -A Modules.common.libs.celery.app worker --pool=threads --loglevel=info --queues=default,email_queues -n worker-admin@%h; \
+    elif [ "$SERVICE_TYPE" = "celery-worker-quant" ]; then \
+    celery -A Modules.common.libs.celery.app worker --pool=threads --loglevel=info --queues=quant_concept_queues,quant_industry_queues,quant_stock_queues -n worker-quant@%h; \
     elif [ "$SERVICE_TYPE" = "celery-beat" ]; then \
-        celery -A Modules.common.libs.celery.celery_service beat --loglevel=info; \
+    celery -A Modules.common.libs.celery.app beat --loglevel=info; \
     elif [ "$SERVICE_TYPE" = "flower" ]; then \
-        celery -A Modules.common.libs.celery.celery_service flower --port=5555; \
+    celery -A Modules.common.libs.celery.app flower --port=5555; \
     else \
-        uvicorn Modules.main:app --host 0.0.0.0 --port 8009; \
+    uvicorn Modules.main:app --host 0.0.0.0 --port 8009; \
     fi

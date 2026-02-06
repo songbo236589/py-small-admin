@@ -1,159 +1,199 @@
-﻿# 数据库迁移
+# 数据库迁移
 
-本文档介绍了如何使用 Alembic 进行数据库迁移。
+本文档介绍 Py Small Admin 项目的**模块化多独立迁移系统**。
 
-## Alembic 简介
+## 迁移架构概览
 
-Alembic 是 SQLAlchemy 的轻量级数据库迁移工具，用于：
+```mermaid
+graph TB
+    A[数据库迁移系统] --> B[命令行工具]
+    A --> C[模块发现器]
+    A --> D[迁移管理器]
 
-- 管理数据库架构变更
-- 自动生成迁移脚本
-- 版本控制数据库结构
-- 支持升级和回滚
+    B --> E[python -m commands.migrate]
 
-## 初始化 Alembic
+    C --> F[扫描 Modules 目录]
+    C --> G[自动发现模块]
+    C --> H[验证模块结构]
 
-### 1. 安装 Alembic
+    D --> I[模块独立迁移]
+
+    I --> J1[admin 模块]
+    I --> J2[quant 模块]
+    I --> J3[其他模块]
+
+    J1 --> K1[fa_admin_alembic_versions]
+    J2 --> K2[fa_quant_alembic_versions]
+    J3 --> K3[fa_xxx_alembic_versions]
+```
+
+## 核心设计理念
+
+### 1. 模块独立迁移
+
+每个业务模块都有自己**独立的迁移系统**：
+
+```
+server/Modules/
+├── admin/
+│   └── migrations/
+│       ├── alembic.ini          # 独立配置
+│       ├── env.py                # 独立环境
+│       ├── script.py.mako        # 迁移模板
+│       └── versions/             # 版本文件
+│           └── 20260113_1211_385f79955eaa_admin数据表.py
+└── quant/
+    └── migrations/
+        ├── alembic.ini
+        ├── env.py
+        ├── script.py.mako
+        └── versions/
+            └── 20260120_1509_71effa3b7543_quant数据表.py
+```
+
+### 2. 版本表隔离
+
+每个模块使用独立的版本表，互不干扰：
+
+| 模块 | 版本表 | 说明 |
+|------|--------|------|
+| admin | `fa_admin_alembic_versions` | 管理 admin 模块的迁移版本 |
+| quant | `fa_quant_alembic_versions` | 管理 quant 模块的迁移版本 |
+
+### 3. 表前缀过滤
+
+通过 `include_object` 过滤器，确保每个迁移只处理自己模块的表：
+
+- admin 模块只处理 `fa_admin_*` 表
+- quant 模块只处理 `fa_quant_*` 表
+
+## 目录结构
+
+```
+server/
+├── commands/
+│   └── migrate.py              # 迁移命令行工具
+├── Modules/
+│   ├── admin/
+│   │   ├── models/             # admin 模型的定义
+│   │   │   ├── __init__.py
+│   │   │   ├── admin_admin.py
+│   │   │   ├── admin_group.py
+│   │   │   └── admin_rule.py
+│   │   └── migrations/         # admin 迁移目录
+│   │       ├── alembic.ini
+│   │       ├── env.py
+│   │       ├── script.py.mako
+│   │       └── versions/
+│   └── quant/
+│       ├── models/             # quant 模型的定义
+│       │   ├── __init__.py
+│       │   ├── quant_stock.py
+│       │   └── quant_industry.py
+│       └── migrations/         # quant 迁移目录
+│           ├── alembic.ini
+│           ├── env.py
+│           ├── script.py.mako
+│           └── versions/
+```
+
+## 命令行工具
+
+### 基本用法
 
 ```bash
-pip install alembic
+# 查看帮助
+python -m commands.migrate --help
+
+# 列出所有模块及其迁移状态
+python -m commands.migrate list
 ```
 
-### 2. 初始化 Alembic
+### 初始化模块迁移
 
 ```bash
-cd server
-alembic init alembic
+# 为新模块初始化迁移系统
+python -m commands.migrate init --module example
 ```
 
-这将创建 `alembic/` 目录和 `alembic.ini` 配置文件。
+执行后会在 `Modules/example/migrations/` 目录下创建：
+- `alembic.ini` - Alembic 配置文件
+- `env.py` - 环境配置（包含模型导入和表过滤逻辑）
+- `script.py.mako` - 迁移文件模板
+- `versions/` - 版本文件目录
 
-### 3. 配置 Alembic
+### 创建迁移文件
 
-编辑 `alembic.ini`：
+```bash
+# 自动生成迁移（检测模型变化）
+python -m commands.migrate create --module admin --message "添加用户表"
 
-```ini
-# 数据库连接字符串
-sqlalchemy.url = mysql://root:password@localhost:3306/py_small_admin
-
-# 迁移脚本存放目录
-script_location = alembic
-
-# 迁移脚本文件名格式
-file_template = %%(rev)s_%%(slug)s
-
-# 时区设置
-timezone = Asia/Shanghai
+# 简写形式
+python -m commands.migrate create -m admin -msg "添加用户表"
 ```
 
-编辑 `alembic/env.py`：
+生成的迁移文件名格式：`{year}{month}{day}_{hour}{minute}_{revision}_{message}.py`
+
+例如：`20260113_1211_385f79955eaa_添加用户表.py`
+
+### 执行迁移
+
+```bash
+# 升级指定模块到最新版本
+python -m commands.migrate up --module admin
+
+# 升级指定模块到指定版本
+python -m commands.migrate up --module admin --revision 385f79955eaa
+
+# 升级所有模块到最新版本
+python -m commands.migrate up
+
+# 降级指定模块一个版本
+python -m commands.migrate down --module admin
+
+# 降级指定模块到指定版本
+python -m commands.migrate down --module admin --revision base
+```
+
+### 查看状态
+
+```bash
+# 查看所有模块状态
+python -m commands.migrate list
+
+# 查看指定模块的当前版本
+python -m commands.migrate current --module admin
+
+# 查看指定模块的迁移历史
+python -m commands.migrate history --module admin
+
+# 验证指定模块的迁移系统
+python -m commands.migrate validate --module admin
+```
+
+## 完整命令参考
+
+| 命令 | 参数 | 说明 |
+|------|------|------|
+| `list` | 无 | 列出所有模块及其迁移状态 |
+| `init` | `--module/-m` | 初始化模块的迁移系统 |
+| `create` | `--module/-m`, `--message/-msg` | 创建新的迁移文件 |
+| `up` | `--module/-m` (可选), `--revision/-r` (可选) | 执行迁移升级 |
+| `down` | `--module/-m`, `--revision/-r` (可选) | 执行迁移降级 |
+| `current` | `--module/-m` | 查看模块当前版本 |
+| `history` | `--module/-m` | 查看模块迁移历史 |
+| `validate` | `--module/-m` | 验证模块迁移系统 |
+
+## 迁移文件结构
+
+### 迁移文件示例
 
 ```python
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
-import sys
-import os
+"""添加用户表
 
-# 添加项目路径
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-from Modules.common.libs.config import Config
-
-# 导入所有模型
-from Modules.admin.models.admin_admin import AdminAdmin
-from Modules.admin.models.admin_group import AdminGroup
-from Modules.admin.models.admin_rule import AdminRule
-from Modules.admin.models.admin_sys_config import AdminSysConfig
-from Modules.admin.models.admin_upload import AdminUpload
-from Modules.quant.models.quant_stock import QuantStock
-from Modules.quant.models.quant_industry import QuantIndustry
-from Modules.quant.models.quant_concept import QuantConcept
-# ... 导入其他模型
-
-config = context.config
-
-# 从配置获取数据库 URL
-config.set_main_option("sqlalchemy.url", Config.get("database.connections.mysql.url"))
-
-target_metadata = Base.metadata
-
-def run_migrations_offline() -> " ... "
-def run_migrations_online() -> " ... "
-```
-
-## 创建迁移
-
-### 自动生成迁移
-
-```bash
-# 生成迁移脚本
-alembic revision --autogenerate -m "Initial migration"
-```
-
-这将自动检测模型变化并生成迁移脚本。
-
-### 手动创建迁移
-
-```bash
-# 创建空的迁移脚本
-alembic revision -m "Custom migration"
-```
-
-然后在生成的迁移文件中手动编写 SQL。
-
-## 执行迁移
-
-### 升级到最新版本
-
-```bash
-# 升级到最新版本
-alembic upgrade head
-
-# 升级到指定版本
-alembic upgrade <revision_id>
-
-# 升级 N 个版本
-alembic upgrade +1
-```
-
-### 回滚迁移
-
-```bash
-# 回滚到上一个版本
-alembic downgrade -1
-
-# 回滚到初始版本
-alembic downgrade base
-
-# 回滚到指定版本
-alembic downgrade <revision_id>
-```
-
-### 查看当前版本
-
-```bash
-# 查看当前数据库版本
-alembic current
-
-# 查看迁移历史
-alembic history
-
-# 查看待执行的迁移
-alembic heads
-```
-
-## 迁移脚本结构
-
-### 迁移脚本示例
-
-```python
-"""Initial migration
-
-Revision ID: 001
-Revises: 
-Create Date: 2024-01-01 00:00:00.000000
+Revision ID: 385f79955eaa
+Revises:
+Create Date: 2026-01-13 12:11:00.000000
 
 """
 from alembic import op
@@ -161,310 +201,511 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 
 # revision identifiers
-revision = '001'
+revision = '385f79955eaa'
 down_revision = None
 branch_labels = None
 depends_on = None
 
-def upgrade():
+
+def upgrade() -> None:
     """升级操作"""
     # 创建管理员表
     op.create_table(
         'fa_admin_admins',
         sa.Column('id', mysql.INTEGER(unsigned=True), autoincrement=True, nullable=False),
-        sa.Column('name', sa.String(100), nullable=False, server_default=''),
-        sa.Column('username', sa.String(50), nullable=False),
-        sa.Column('password', sa.String(255), nullable=False),
+        sa.Column('username', sa.String(50), nullable=False, comment='用户名'),
+        sa.Column('password', sa.String(255), nullable=False, comment='密码'),
+        sa.Column('real_name', sa.String(100), nullable=True, comment='真实姓名'),
+        sa.Column('email', sa.String(100), nullable=True, comment='邮箱'),
+        sa.Column('avatar', sa.String(255), nullable=True, comment='头像'),
+        sa.Column('is_active', sa.Boolean(), default=True, comment='是否激活'),
+        sa.Column('created_at', sa.DateTime(), nullable=True, comment='创建时间'),
+        sa.Column('updated_at', sa.DateTime(), nullable=True, comment='更新时间'),
         sa.PrimaryKeyConstraint('id'),
         mysql_charset='utf8mb4',
         mysql_collate='utf8mb4_unicode_ci',
         comment='管理员表'
     )
-    
-    # 创建索引
-    op.create_index('idx_admin_admins_username', 'fa_admin_admins', ['username'], unique=True)
 
-def downgrade():
+    # 创建索引
+    op.create_index('ix_fa_admin_admins_username', 'fa_admin_admins', ['username'], unique=True)
+
+
+def downgrade() -> None:
     """回滚操作"""
     # 删除索引
-    op.drop_index('idx_admin_admins_username', table_name='fa_admin_admins')
-    
+    op.drop_index('ix_fa_admin_admins_username', table_name='fa_admin_admins')
+
     # 删除表
     op.drop_table('fa_admin_admins')
 ```
 
-## 常见操作
+## 常见迁移操作
 
 ### 添加表
 
 ```python
-def upgrade():
+def upgrade() -> None:
     op.create_table(
-        'your_table',
+        'fa_admin_roles',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(100), nullable=False),
-        sa.PrimaryKeyConstraint('id')
+        sa.PrimaryKeyConstraint('id'),
+        mysql_charset='utf8mb4',
+        comment='角色表'
     )
 
-def downgrade():
-    op.drop_table('your_table')
+def downgrade() -> None:
+    op.drop_table('fa_admin_roles')
 ```
 
 ### 添加列
 
 ```python
-def upgrade():
-    op.add_column('your_table', sa.Column('new_column', sa.String(100), nullable=True))
+def upgrade() -> None:
+    op.add_column(
+        'fa_admin_admins',
+        sa.Column('phone', sa.String(20), nullable=True, comment='手机号')
+    )
 
-def downgrade():
-    op.drop_column('your_table', 'new_column')
+def downgrade() -> None:
+    op.drop_column('fa_admin_admins', 'phone')
 ```
 
 ### 修改列
 
 ```python
-def upgrade():
-    op.alter_column('your_table', 'column_name', 
-                   existing_type=sa.String(50),
-                   type_=sa.String(100),
-                   nullable=False)
+def upgrade() -> None:
+    op.alter_column(
+        'fa_admin_admins',
+        'username',
+        existing_type=sa.String(50),
+        type_=sa.String(100),
+        nullable=False
+    )
 
-def downgrade():
-    op.alter_column('your_table', 'column_name',
-                   existing_type=sa.String(100),
-                   type_=sa.String(50),
-                   nullable=True)
+def downgrade() -> None:
+    op.alter_column(
+        'fa_admin_admins',
+        'username',
+        existing_type=sa.String(100),
+        type_=sa.String(50),
+        nullable=False
+    )
 ```
 
 ### 删除列
 
 ```python
-def upgrade():
-    op.drop_column('your_table', 'column_name')
+def upgrade() -> None:
+    op.drop_column('fa_admin_admins', 'phone')
 
-def downgrade():
-    op.add_column('your_table', sa.Column('column_name', sa.String(100)))
+def downgrade() -> None:
+    op.add_column(
+        'fa_admin_admins',
+        sa.Column('phone', sa.String(20), nullable=True)
+    )
 ```
 
 ### 添加索引
 
 ```python
-def upgrade():
-    op.create_index('idx_table_column', 'your_table', ['column_name'])
+def upgrade() -> None:
+    # 普通索引
+    op.create_index(
+        'ix_fa_admin_admins_email',
+        'fa_admin_admins',
+        ['email']
+    )
 
-def downgrade():
-    op.drop_index('idx_table_column', table_name='your_table')
+    # 唯一索引
+    op.create_index(
+        'ix_fa_admin_admins_username',
+        'fa_admin_admins',
+        ['username'],
+        unique=True
+    )
+
+def downgrade() -> None:
+    op.drop_index('ix_fa_admin_admins_email', table_name='fa_admin_admins')
+    op.drop_index('ix_fa_admin_admins_username', table_name='fa_admin_admins')
 ```
 
 ### 添加外键
 
 ```python
-def upgrade():
+def upgrade() -> None:
     op.create_foreign_key(
-        'fk_table_column',
-        'child_table',
-        'parent_table',
-        ['parent_id'],
-        ['id']
+        'fk_fa_admin_admins_role_id',
+        'fa_admin_admins',
+        'fa_admin_roles',
+        ['role_id'],
+        ['id'],
+        ondelete='CASCADE'
     )
 
-def downgrade():
-    op.drop_constraint('fk_table_column', 'child_table', type_='foreignkey')
+def downgrade() -> None:
+    op.drop_constraint('fk_fa_admin_admins_role_id', 'fa_admin_admins', type_='foreignkey')
 ```
 
-## 数据迁移
-
-### 迁移数据
+### 数据迁移
 
 ```python
 from sqlalchemy.sql import table, column
 
-def upgrade():
+def upgrade() -> None:
     # 定义数据表对象
-    users_table = table('users',
+    admins_table = table(
+        'fa_admin_admins',
         column('id', sa.Integer),
-        column('name', sa.String(100))
+        column('username', sa.String),
+        column('password', sa.String),
     )
-    
-    # 执行批量插入
-    op.bulk_insert(users_table, [
-        {'id': 1, 'name': 'User 1'},
-        {'id': 2, 'name': 'User 2'},
-        {'id': 3, 'name': 'User 3'},
+
+    # 批量插入数据
+    op.bulk_insert(admins_table, [
+        {
+            'id': 1,
+            'username': 'admin',
+            'password': 'hashed_password_here',
+        },
+        {
+            'id': 2,
+            'username': 'user',
+            'password': 'hashed_password_here',
+        },
     ])
 
-def downgrade():
-    # 删除数据
-    op.execute("DELETE FROM users WHERE id IN (1, 2, 3)")
+def downgrade() -> None:
+    op.execute("DELETE FROM fa_admin_admins WHERE id IN (1, 2)")
 ```
 
-## 命令行工具
+## 配置文件说明
 
-项目提供了便捷的命令行工具。
+### alembic.ini
 
-### 使用命令行工具
+每个模块的 `migrations/alembic.ini` 配置：
+
+```ini
+[alembic]
+# 迁移脚本路径
+script_location = Modules/admin/migrations
+
+# 文件名模板
+file_template = %%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev)s_%%(slug)s
+
+# 版本路径分隔符
+version_path_separator = os
+
+# 数据库连接 URL（由 env.py 动态设置）
+sqlalchemy.url =
+```
+
+### env.py 核心功能
+
+每个模块的 `env.py` 包含以下核心功能：
+
+#### 1. 动态导入模型
+
+```python
+# 导入模块的所有模型
+from Modules.admin.models import *
+from Modules.common.models.base_model import BaseModel
+from sqlmodel import SQLModel
+
+# 获取 SQLModel 元数据
+target_metadata = SQLModel.metadata
+```
+
+#### 2. 动态数据库 URL
+
+```python
+from Modules.common.libs.config import Config
+
+default_connection = Config.get("database.default", "mysql")
+connections = Config.get("database.connections", {})
+db_config = connections.get(default_connection, {})
+
+# 构建数据库 URL
+database_url = f"mysql+mysqldb://{username}:{password}@{host}:{port}/{database}"
+config.set_main_option("sqlalchemy.url", database_url)
+```
+
+#### 3. 表前缀过滤
+
+```python
+def include_object(object, name, type_, reflected, compare_to):
+    """只处理当前模块的表"""
+    if type_ == "table" and name:
+        # 获取表前缀
+        table_prefix = db_config.get("prefix", "fa_")
+        expected_prefix = f"{table_prefix}admin_"
+
+        # 只处理属于当前模块的表
+        if name.startswith(expected_prefix):
+            return True
+        return False
+
+    # 处理索引和约束
+    if type_ in ("index", "constraint") and name:
+        expected_table_name = f"{table_prefix}admin"
+        if expected_table_name in name:
+            return True
+        return False
+
+    return True
+```
+
+#### 4. 独立版本表
+
+```python
+# 每个模块使用独立的版本表
+table_prefix = db_config.get("prefix", "fa_")
+version_table = f"{table_prefix}admin_alembic_versions"
+
+context.configure(
+    connection=connection,
+    target_metadata=target_metadata,
+    version_table=version_table,  # 独立版本表
+    include_object=include_object,  # 表过滤
+)
+```
+
+## 工作流程
+
+### 1. 创建新模块
 
 ```bash
-# 初始化数据库
-python commands/migrate.py init
+# 1. 创建模块目录结构
+mkdir -p Modules/example/models
 
-# 升级到最新版本
-python commands/migrate.py upgrade head
+# 2. 创建模型文件
+touch Modules/example/models/__init__.py
+touch Modules/example/models/example_model.py
 
-# 回滚到上一个版本
-python commands/migrate.py downgrade -1
+# 3. 初始化迁移系统
+python -m commands.migrate init --module example
 
-# 回滚到初始版本
-python commands/migrate.py downgrade base
+# 4. 创建第一个迁移
+python -m commands.migrate create --module example --message "初始迁移"
+```
 
-# 生成迁移脚本
-python commands/migrate.py revision --autogenerate -m "Add new table"
+### 2. 修改模型后创建迁移
 
-# 查看当前版本
-python commands/migrate.py current
+```bash
+# 1. 修改模型文件
+vim Modules/admin/models/admin_admin.py
 
-# 查看迁移历史
-python commands/migrate.py history
+# 2. 创建迁移
+python -m commands.migrate create --module admin --message "添加手机号字段"
+
+# 3. 检查生成的迁移文件
+vim Modules/admin/migrations/versions/xxxxx_添加手机号字段.py
+
+# 4. 执行迁移
+python -m commands.migrate up --module admin
+```
+
+### 3. 部署到生产环境
+
+```bash
+# 1. 备份数据库
+mysqldump -u root -p py_small_admin > backup_$(date +%Y%m%d).sql
+
+# 2. 查看待执行的迁移
+python -m commands.migrate list
+
+# 3. 执行迁移（先在测试环境验证）
+python -m commands.migrate up
+
+# 4. 验证迁移结果
+python -m commands.migrate list
 ```
 
 ## 最佳实践
 
-### 1. 迁移命名
-
-使用清晰、描述性的迁移名称：
+### 1. 迁移命名规范
 
 ```bash
-# 好的命名
-alembic revision -m "Add email field to users table"
-alembic revision -m "Create orders table with foreign keys"
+# 推荐：清晰的中文描述
+python -m commands.migrate create --module admin --message "添加用户表"
+python -m commands.migrate create --module admin --message "添加手机号唯一索引"
+python -m commands.migrate create --module admin --message "修改密码字段长度为255"
 
-# 不好的命名
-alembic revision -m "Update db"
-alembic revision -m "Fix stuff"
+# 避免：模糊的描述
+python -m commands.migrate create --module admin --message "更新"
+python -m commands.migrate create --module admin --message "fix"
 ```
 
-### 2. 迁移分组
+### 2. 保持可逆性
 
-按功能分组迁移：
-
-```bash
-# Admin 模块迁移
-alembic revision -m "admin: Add admin table"
-
-# Quant 模块迁移
-alembic revision -m "quant: Add stock table"
-```
-
-### 3. 保持可逆
-
-始终实现 `downgrade()` 函数，确保可以回滚：
+始终实现 `downgrade()` 函数：
 
 ```python
-def upgrade():
-    # 可逆的操作
-    pass
+def upgrade() -> None:
+    # 添加可逆的操作
+    op.add_column('fa_admin_admins', sa.Column('phone', sa.String(20)))
 
-def downgrade():
-    # 回滚操作
-    pass
+def downgrade() -> None:
+    # 提供完整的回滚逻辑
+    op.drop_column('fa_admin_admins', 'phone')
 ```
 
-### 4. 测试迁移
-
-在执行迁移前，先在开发环境测试：
+### 3. 小步提交
 
 ```bash
-# 在开发环境测试
-alembic upgrade head
-alembic downgrade -1
+# 推荐：每次迁移只做一件事
+python -m commands.migrate create --module admin --message "添加手机号字段"
+python -m commands.migrate create --module admin --message "添加手机号索引"
 
-# 确认无误后，在生产环境执行
+# 避免：一次迁移做太多改动
+python -m commands.migrate create --module admin --message "重构用户表"
 ```
 
-### 5. 备份数据
-
-在生产环境执行迁移前，先备份数据：
+### 4. 先测试后部署
 
 ```bash
-# 备份数据库
-mysqldump -u root -p py_small_admin > backup_before_migration_$(date +%Y%m%d).sql
+# 1. 在开发环境测试
+python -m commands.migrate up --module admin
+python -m commands.migrate down --module admin
+
+# 2. 在测试环境验证
+python -m commands.migrate up --module admin
+
+# 3. 确认无误后部署到生产环境
+```
+
+### 5. 备份数据库
+
+```bash
+# 生产环境迁移前务必备份
+mysqldump -u root -p py_small_admin > backup_before_migration_$(date +%Y%m%d_%H%M%S).sql
 ```
 
 ## 常见问题
 
-### 1. 自动生成失败
+### 1. 自动生成没有检测到模型变化
 
-**问题**：`alembic revision --autogenerate` 报错
-
-**解决方案**：
-
-1. 确保所有模型都已导入
-2. 检查 `alembic/env.py` 中的 `target_metadata`
-3. 清除缓存：`rm -rf alembic/__pycache__/`
-
-### 2. 迁移冲突
-
-**问题**：多个开发者同时创建迁移导致冲突
+**问题**：创建迁移后，生成的迁移文件是空的。
 
 **解决方案**：
 
-1. 使用唯一的迁移 ID
-2. 合并迁移时手动解决冲突
-3. 使用 `--head` 参数重新生成迁移
+1. 确保模型已在 `Modules/{module}/models/__init__.py` 中导出
+2. 检查模型是否继承自 `BaseModel`
+3. 确认 `env.py` 中正确导入了模块模型
+
+```python
+# Modules/admin/models/__init__.py
+from .admin_admin import AdminAdmin
+from .admin_group import AdminGroup
+
+__all__ = ['AdminAdmin', 'AdminGroup']
+```
+
+### 2. 迁移执行失败
+
+**问题**：执行 `python -m commands.migrate up` 时报错。
+
+**解决方案**：
+
+1. 查看详细错误信息
+2. 检查数据库连接是否正常
+3. 检查表是否已存在
+4. 手动修复后使用 `--revision` 跳过有问题的迁移
+
+```bash
+# 降级到上一个版本
+python -m commands.migrate down --module admin
+
+# 手动修复数据库后，标记当前版本
+python -m commands.migrate up --module admin --revision <revision_id>
+```
 
 ### 3. 回滚失败
 
-**问题**：`alembic downgrade` 失败
+**问题**：执行 `down` 命令时失败。
 
 **解决方案**：
 
-1. 检查 `downgrade()` 函数是否正确
-2. 手动修复数据库
-3. 标记迁移为已应用：`alembic stamp <revision_id>`
+1. 检查 `downgrade()` 函数是否完整
+2. 检查是否有外键约束阻止删除
+3. 考虑手动修复数据库
 
-### 4. 数据库连接失败
+### 4. 模块发现失败
 
-**问题**：无法连接到数据库
+**问题**：`python -m commands.migrate list` 没有显示新模块。
 
 **解决方案**：
 
-1. 检查数据库服务是否运行
-2. 检查 `alembic.ini` 中的连接字符串
-3. 检查数据库用户名和密码
+确保模块结构正确：
+
+```
+Modules/example/
+├── models/
+│   ├── __init__.py      # 必须存在
+│   └── example_model.py # 至少有一个模型
+```
+
+### 5. 版本表冲突
+
+**问题**：多个模块的迁移相互影响。
+
+**解决方案**：
+
+确保每个模块使用独立的版本表，检查 `env.py` 中的配置：
+
+```python
+version_table = f"{table_prefix}{module_name}_alembic_versions"
+```
 
 ## 高级用法
 
-### 1. 批量操作
+### 1. 批量创建迁移
 
-```python
-def upgrade():
-    # 批量创建表
-    for table_name in ['table1', 'table2', 'table3']:
-        op.create_table(
-            table_name,
-            sa.Column('id', sa.Integer(), nullable=False),
-            sa.PrimaryKeyConstraint('id')
-        )
+```bash
+# 升级所有模块
+python -m commands.migrate up
+
+# 查看所有模块状态
+python -m commands.migrate list
 ```
 
 ### 2. 条件迁移
 
 ```python
-def upgrade():
-    # 根据数据库版本执行不同操作
-    if context.get_x_argument('version') == '1':
-        op.add_column('users', sa.Column('email', sa.String(100)))
-    else:
-        op.add_column('users', sa.Column('email', sa.String(200)))
+def upgrade() -> None:
+    # 根据数据库类型执行不同操作
+    from alembic import context
+    if context.bind.dialect.name == 'mysql':
+        op.execute("ALTER TABLE fa_admin_admins ENGINE=InnoDB")
 ```
 
-### 3. 数据库特定操作
+### 3. 数据修复迁移
 
 ```python
-def upgrade():
-    # MySQL 特定操作
-    if context.bind.dialect.name == 'mysql':
-        op.execute("ALTER TABLE users ENGINE=InnoDB")
+def upgrade() -> None:
+    # 修复历史数据
+    op.execute("""
+        UPDATE fa_admin_admins
+        SET email = CONCAT(username, '@example.com')
+        WHERE email IS NULL
+    """)
+
+def downgrade() -> None:
+    # 记录修复操作，通常不需要回滚
+    pass
+```
+
+### 4. 原子性迁移
+
+```python
+from alembic import op
+
+def upgrade() -> None:
+    # 使用批量操作确保原子性
+    with op.batch_alter_table('fa_admin_admins') as batch_op:
+        batch_op.add_column(sa.Column('phone', sa.String(20), nullable=True))
+        batch_op.add_column(sa.Column('address', sa.String(255), nullable=True))
 ```
 
 ## 生产环境建议
@@ -472,28 +713,51 @@ def upgrade():
 ### 1. 代码审查
 
 迁移脚本必须经过代码审查：
-
-- 检查 SQL 语句是否正确
-- 检查是否有性能问题
-- 检查回滚操作是否完整
+- 检查 SQL 语句正确性
+- 检查是否有性能问题（如大表添加索引）
+- 确认回滚操作完整
 
 ### 2. 灰度发布
 
-逐步在生产环境部署迁移：
+对于大型迁移，考虑分阶段部署：
 
-1. 先在一个实例上执行迁移
-2. 观察运行情况
-3. 逐步扩展到所有实例
+```bash
+# 1. 先在单台服务器执行
+python -m commands.migrate up --module admin
+
+# 2. 观察运行情况
+
+# 3. 逐步扩展到所有服务器
+```
 
 ### 3. 监控和日志
 
-记录迁移执行情况：
+迁移执行时记录日志：
 
 ```python
 from loguru import logger
 
-def upgrade():
-    logger.info("Starting migration...")
-    # 迁移逻辑
-    logger.info("Migration completed successfully")
+def upgrade() -> None:
+    logger.info("开始执行迁移：添加用户表")
+    try:
+        op.create_table('fa_admin_admins', ...)
+        logger.info("迁移执行成功")
+    except Exception as e:
+        logger.error(f"迁移执行失败：{e}")
+        raise
+```
+
+### 4. 回滚预案
+
+始终准备好回滚方案：
+
+```bash
+# 1. 备份数据库
+mysqldump -u root -p py_small_admin > backup.sql
+
+# 2. 记录当前版本
+python -m commands.migrate list > version_state.txt
+
+# 3. 如果迁移失败，执行回滚
+python -m commands.migrate down --module admin
 ```

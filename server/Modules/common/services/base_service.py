@@ -139,6 +139,10 @@ class BaseService:
             [dict[str, Any], Any], Awaitable[tuple[dict[str, Any], Any] | JSONResponse]
         ]
         | None = None,
+        post_operation_callback: Callable[
+            [Any, dict[str, Any], Any], Awaitable[None]
+        ]
+        | None = None,
         success_message: str = "添加成功",
         error_message: str = "添加失败",
     ) -> JSONResponse:
@@ -148,6 +152,7 @@ class BaseService:
             data: 要添加的数据
             model_class: 模型类
             pre_operation_callback: 前置操作回调函数，接收data和session参数（可选）
+            post_operation_callback: 后置操作回调函数，接收instance、data和session参数（可选）
             success_message: 成功时的返回消息
             error_message: 失败时的返回消息
 
@@ -176,6 +181,10 @@ class BaseService:
             await session.commit()
             await session.refresh(instance)
 
+            # 执行后置操作回调（如果提供）
+            if post_operation_callback:
+                await post_operation_callback(instance, data, session)
+
             return success(None, message=success_message)
 
     async def common_update(
@@ -189,6 +198,10 @@ class BaseService:
         ]
         | None = None,
         field_update_callback: Callable[[Any, dict[str, Any]], None] | None = None,
+        post_operation_callback: Callable[
+            [Any, dict[str, Any], Any], Awaitable[None]
+        ]
+        | None = None,
         success_message: str = "更新成功",
         error_message: str = "记录不存在",
     ) -> JSONResponse:
@@ -200,6 +213,7 @@ class BaseService:
             model_class: 模型类
             pre_operation_callback: 前置操作回调函数（可选）
             field_update_callback: 字段更新回调函数（可选）
+            post_operation_callback: 后置操作回调函数，接收instance、data和session参数（可选）
             success_message: 成功时的返回消息
             error_message: 失败时的返回消息
 
@@ -240,6 +254,10 @@ class BaseService:
             # 提交事务
             await session.commit()
             await session.refresh(record)
+
+            # 执行后置操作回调（如果提供）
+            if post_operation_callback:
+                await post_operation_callback(record, data, session)
 
             return success(None, message=success_message)
 

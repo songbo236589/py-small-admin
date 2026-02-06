@@ -22,6 +22,7 @@ class CaptchaResult(BaseModel):
     answer: str | None = None
     expire_seconds: int
     metadata: dict[str, Any] = {}
+    font_size: int | None = None
 
     def model_dump(self, **kwargs) -> dict[str, Any]:
         """重写 model_dump 方法，自动处理 bytes 类型的 image_data"""

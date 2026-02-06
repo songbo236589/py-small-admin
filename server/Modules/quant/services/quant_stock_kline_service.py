@@ -63,11 +63,13 @@ class QuantStockKlineService(BaseService):
 
                 # 为每只股票提交队列任务
                 for index, stock in enumerate(stocks):
-                    # 设置延时，避免同时执行太多任务（每个任务间隔2秒）
-                    countdown = index * 60
+                    # 使用 eta 参数设置精确执行时间，避免 RabbitMQ consumer timeout
+                    # 任务将在指定时间才被 RabbitMQ 分配给 worker，而不是提前拉取后等待
+                    # 增加间隔到 180 秒（3分钟），降低请求密度，避免触发东方财富网限流
+                    eta = now() + timedelta(seconds=index * 180)
                     sync_stock_kline_1d_queue.apply_async(
                         args=[stock.id, stock.stock_code, stock.stock_name],
-                        countdown=countdown,
+                        eta=eta,
                     )
 
                 return success(

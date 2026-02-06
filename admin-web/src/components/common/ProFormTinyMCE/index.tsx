@@ -447,7 +447,7 @@ const ProFormTinyMCE: React.FC<ProFormTinyMCEProps> = ({
 
       {/* 媒体类型选择对话框 */}
       <Modal
-        visible={mediaTypeModalVisible}
+        open={mediaTypeModalVisible}
         title="选择媒体类型"
         onCancel={() => {
           setMediaTypeModalVisible(false);
