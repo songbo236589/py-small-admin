@@ -948,15 +948,18 @@ class ContentPublishLog(BaseTableModel, table=True):
 ### 6.1 基础发布器设计
 
 ```python
-# services/publisher/base_publisher.py
+# services/publisher/base_platform_handler.py
 from abc import ABC, abstractmethod
 from playwright.async_api import async_playwright, Browser, Page
 
-class BasePublisher(ABC):
-    """平台发布器基类"""
+class BasePlatformHandler(ABC):
+    """平台处理器基类（融合验证和发布）"""
 
-    def __init__(self, account: PlatformAccount):
-        self.account = account
+    def __init__(self, cookies: list[dict], user_agent: str | None = None,
+                 article_data: dict[str, Any] | None = None):
+        self.cookies = cookies
+        self.user_agent = user_agent
+        self.article_data = article_data
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
 
@@ -967,43 +970,24 @@ class BasePublisher(ABC):
         pass
 
     @abstractmethod
-    async def publish(self, article: Article) -> PublishResult:
+    async def verify(self) -> dict:
+        """验证 Cookie"""
+        pass
+
+    @abstractmethod
+    async def publish(self) -> PublishResult:
         """发布文章"""
         pass
 
-    async def _init_browser(self):
-        """初始化浏览器"""
-        playwright = await async_playwright().start()
-        self.browser = await playwright.chromium.launch(
-            headless=False,  # 调试时可设为False
-            args=['--no-sandbox']
-        )
-        self.page = await self.browser.new_page()
-
-    async def _load_cookies(self):
-        """加载Cookie"""
-        cookies = self.account.get_cookies()
-        await self.page.goto(f"https://{self.platform_domain}")
-        for cookie in cookies:
-            await self.page.context.add_cookie(cookie)
-
-    async def _verify_login(self) -> bool:
-        """验证登录状态"""
-        # 子类实现
-        pass
-
-    async def close(self):
-        """关闭浏览器"""
-        if self.browser:
-            await self.browser.close()
+    # ... 其他辅助方法
 ```
 
 ```python
-# services/publisher/zhihu_publisher.py
-from .base_publisher import BasePublisher
+# services/publisher/zhihu_handler.py
+from .base_platform_handler import BasePlatformHandler
 
-class ZhihuPublisher(BasePublisher):
-    """知乎文章发布器"""
+class ZhihuHandler(BasePlatformHandler):
+    """知乎处理器（融合验证和发布）"""
 
     @property
     def platform_name(self) -> str:
@@ -1894,18 +1878,17 @@ except Exception as e:
 
 ---
 
-> 文档版本：v7.1
+> 文档版本：v8.0
 > 创建日期：2026-02-05
-> 更新日期：2026-02-05
+> 更新日期：2026-02-09
 > 更新内容：
->   - 完成 Content 模块全部代码实现（Routes/Controllers/Services/Validators）
->   - 扩展 BaseService 添加 post_operation_callback 支持多对多关系处理
->   - Content 路由已注册到主应用 main.py
->   - 完成数据库迁移，创建所有数据表
->   - 支持文章-标签多对多关联的后置操作处理
->   - 完成 Content 模块种子数据（菜单规则）
->   - 完成前端页面开发（6个模块：控制台+5个管理模块）
->   - 菜单结构改为三层结构（主菜单→控制台/分组→子菜单）
+>   - ✅ 完成 Cookie 验证功能（后端 API + Playwright 集成）
+>   - ✅ 实现知乎平台 Cookie 验证器
+>   - ✅ 添加完整的反检测机制（随机延迟、人类行为模拟）
+>   - ✅ 解决 Windows 系统 Playwright 兼容性问题
+>   - ✅ 添加验证间隔限制（防止频繁验证）
+>   - ✅ 完成浏览器自动化配置文档
+>   - v7.2 内容：Content 模块全部代码实现、数据库迁移、前端页面开发、浏览器扩展等
 > 分析基于：ArtiPub 项目 + py-small-admin 项目架构深度分析
 
 ## 实现进度
@@ -1923,9 +1906,237 @@ except Exception as e:
 - [x] 前端页面开发 (6个模块：控制台+5个管理模块)
 
 ### 待实现 ⏳
+- [ ] 知乎发布器开发
 - [ ] Celery 异步发布任务
-- [ ] Playwright 浏览器自动化
-- [ ] Cookie 验证功能
+- [ ] 文章自动发布功能
+- [ ] 批量发布功能
+
+### Cookie 验证功能 ✅ 已完成
+
+**实现时间**：2026-02-09
+
+**功能概述**：
+- 使用 Playwright 浏览器自动化验证平台账号 Cookie 有效性
+- 支持知乎平台的登录状态检测和文章发布
+- 完整的反检测机制，降低平台封号风险
+- Windows 系统兼容性解决方案
+
+**核心实现**：
+
+1. **BasePlatformHandler 基类** ([base_platform_handler.py](server/Modules/content/services/publisher/base_platform_handler.py))
+   - 融合验证和发布功能的统一处理器基类
+   - 实现通用的浏览器初始化、Cookie 加载、登录检测逻辑
+   - 提供人类行为模拟方法（随机延迟、滚动、鼠标移动）
+   - 支持 `verify()` 和 `publish()` 两种操作模式
+
+2. **ZhihuHandler 处理器** ([zhihu_handler.py](server/Modules/content/services/publisher/zhihu_handler.py))
+   - 实现知乎特定的登录状态检测和文章发布
+   - 使用知乎专用的 DOM 选择器进行验证和发布
+   - 融合了之前 ZhihuVerifier 和 ZhihuPublisher 的所有功能
+
+3. **验证 API** ([platform_account_controller.py](server/Modules/content/controllers/v1/platform_account_controller.py))
+   - `/api/content/platform_account/verify/{id}` - 验证指定账号的 Cookie
+   - 验证间隔限制（默认 5 分钟最小间隔）
+   - 验证结果实时更新到数据库
+
+**反检测特性**：
+
+| 特性 | 默认值 | 说明 |
+|------|--------|------|
+| 随机延迟 | 1-3 秒 | 每个操作之间随机延迟，模拟人类操作节奏 |
+| 页面滚动 | 1-3 次 | 随机滚动页面，模拟浏览行为 |
+| 鼠标移动 | 2-4 次 | 随机移动鼠标位置，增加真实性 |
+| 停留时间 | 成功 5-8 秒 / 失败 2-4 秒 | 根据验证结果停留不同时长 |
+| 验证间隔 | 最小 5 分钟 | 防止频繁验证被检测 |
+
+**环境变量配置**：
+
+```bash
+# 内容模块配置（.env）
+# Playwright 浏览器自动化
+CONTENT_PLAYWRIGHT_HEADLESS=True
+CONTENT_PLAYWRIGHT_TIMEOUT=30000
+CONTENT_PLAYWRIGHT_WIDTH=1920
+CONTENT_PLAYWRIGHT_HEIGHT=1080
+
+# 知乎平台配置
+CONTENT_ZHIHU_VERIFY_URL=https://www.zhihu.com
+CONTENT_ZHIHU_LOGIN_SELECTOR=.AppHeader-login
+CONTENT_ZHIHU_LOGGED_IN_SELECTOR=.AppHeader-notifications
+
+# Cookie 验证配置
+CONTENT_COOKIE_VERIFY_INTERVAL=3600
+CONTENT_COOKIE_EXPIRE_WARNING_DAYS=7
+
+# 反检测配置（降低平台封号风险）
+CONTENT_HUMAN_BEHAVIOR_ENABLED=true
+CONTENT_RANDOM_DELAY_MIN=1.0
+CONTENT_RANDOM_DELAY_MAX=3.0
+CONTENT_VERIFY_INTERVAL_MIN=300
+CONTENT_STAY_TIME_SUCCESS_MIN=5.0
+CONTENT_STAY_TIME_SUCCESS_MAX=8.0
+CONTENT_STAY_TIME_FAILED_MIN=2.0
+CONTENT_STAY_TIME_FAILED_MAX=4.0
+CONTENT_SCROLL_COUNT_MIN=1
+CONTENT_SCROLL_COUNT_MAX=3
+CONTENT_MOUSE_MOVE_COUNT_MIN=2
+CONTENT_MOUSE_MOVE_COUNT_MAX=4
+```
+
+**Windows 系统特殊配置**：
+
+在 Windows 系统上使用 Playwright 需要特殊配置：
+
+1. **设置事件循环策略**：
+   在 `run.py` 和 `Modules/main.py` 的最顶部（所有导入之前）添加：
+   ```python
+   import asyncio
+   import sys
+
+   # Windows 系统下使用 SelectorEventLoop 以支持 Playwright 子进程
+   if sys.platform == "win32":
+       asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+   ```
+
+2. **禁用热重载**：
+   将 `.env` 文件中的 `APP_RELOAD` 设置为 `false`
+
+3. **使用正确的启动方式**：
+   必须使用 `python run.py` 启动服务，不能直接使用 `uvicorn` 命令
+
+**验证流程**：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Cookie 验证流程                              │
+└─────────────────────────────────────────────────────────────────┘
+
+1. 验证间隔检查
+   │
+   ▼
+2. 启动 Playwright 浏览器（Chromium）
+   │
+   ▼
+3. 创建浏览器上下文（设置 User-Agent、Viewport）
+   │
+   ▼
+4. 访问平台域名（如 https://www.zhihu.com）
+   │
+   ▼
+5. 添加 Cookies 到浏览器上下文
+   │
+   ▼
+6. 访问验证页面
+   │
+   ▼
+7. 等待页面加载完成
+   │
+   ▼
+8. 模拟人类行为（随机滚动、鼠标移动）
+   │
+   ▼
+9. 检查登录状态（通过 DOM 选择器）
+   │
+   ▼
+10. 更新数据库状态（status、last_verified）
+    │
+    ▼
+11. 关闭浏览器，返回结果
+```
+
+**调试日志**：
+
+验证过程会输出详细的调试日志：
+
+```
+[Cookie验证] ===== 开始验证 =====
+[Cookie验证] 平台: 知乎
+[Cookie验证] Cookie 数量: 15
+[Cookie验证] User-Agent: Mozilla/5.0...
+[Cookie验证] 正在启动 Playwright...
+[Cookie验证] ✓ 浏览器启动成功
+[Cookie验证] 创建浏览器上下文...
+[Cookie验证] ✓ 页面创建成功
+[Cookie验证] ✓ 延迟 2.34 秒
+[Cookie验证] 访问平台域名: https://www.zhihu.com
+[Cookie验证] ✓ 延迟 1.87 秒
+[Cookie验证] 添加 15 个 Cookie...
+[Cookie验证] ✓ Cookie 添加完成
+[Cookie验证] ✓ 延迟 2.12 秒
+[Cookie验证] 访问验证页面: https://www.zhihu.com
+[Cookie验证] ✓ 页面加载完成
+[Cookie验证] ✓ 延迟 2.56 秒
+[Cookie验证] 开始模拟人类行为...
+[Cookie验证] 滚动 1/2: 324px
+[Cookie验证] 鼠标移动 1/3: (1243, 567)
+[Cookie验证] ✓ 人类行为模拟完成
+[Cookie验证] 检查登录状态...
+[Cookie验证] ✓ 验证成功，停留 6.23 秒
+[Cookie验证] ===== 验证结束 =====
+```
+
+**相关文件**：
+
+- 配置类：[server/config/content.py](server/config/content.py)
+- 验证器基类：[server/Modules/content/services/publisher/base_verifier.py](server/Modules/content/services/publisher/base_verifier.py)
+- 知乎验证器：[server/Modules/content/services/publisher/zhihu_verifier.py](server/Modules/content/services/publisher/zhihu_verifier.py)
+- 服务层：[server/Modules/content/services/platform_account_service.py](server/Modules/content/services/platform_account_service.py)
+- 启动文件：[server/run.py](server/run.py)、[server/Modules/main.py](server/Modules/main.py)
+
+## 浏览器扩展状态
+
+### 已完成 ✅
+浏览器扩展用于获取各平台的登录 Cookies，支持一键获取和选择性发送。
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 本地 Cookie 获取 | ✅ | 使用 Chrome Cookies API 获取所有平台 Cookies |
+| 平台列表展示 | ✅ | 从后端 API 获取支持的平台列表 |
+| 按平台分组显示 | ✅ | 显示每个平台获取到的 Cookie 数量 |
+| 点击复制 JSON | ✅ | 点击 Cookie 数量复制 JSON 格式详情 |
+| 选择性发送后端 | ✅ | 只有知乎平台可以发送到后端 |
+| 重新获取功能 | ✅ | 支持刷新获取最新 Cookies |
+| CSS 样式 | ✅ | 完整的 UI 样式和交互效果 |
+
+### 扩展文件结构
+```
+browser-extension/
+├── source/
+│   ├── manifest.json         # Chrome 扩展配置
+│   ├── Popup/
+│   │   ├── Popup.tsx         # 弹窗组件（React）
+│   │   └── styles.less       # 样式文件
+│   ├── Background/index.ts   # 后台脚本
+│   └── assets/icons/         # 图标资源
+├── dist/chrome/              # 构建输出
+└── package.json
+```
+
+### 后端 API 扩展
+为浏览器扩展新增了专门的 API 路由：
+
+| 路径 | 方法 | 说明 |
+|------|------|------|
+| `/api/content/extension/platform/index` | GET | 获取支持的平台列表 |
+| `/api/content/extension/platform_account/import_cookies` | POST | 导入 Cookies 到后端 |
+
+### 下一步：文章发布功能
+
+Cookie 验证功能已完成 ✅，接下来需要实现文章自动发布功能：
+
+```python
+# zhihu_publisher.py（待实现）
+async def publish(self, article: Article) -> PublishResult:
+    """发布文章到知乎"""
+    # 1. 初始化浏览器
+    # 2. 加载 Cookie
+    # 3. 导航到编辑器
+    # 4. 创建临时 Markdown 文件
+    # 5. 上传文件到知乎
+    # 6. 设置发布参数
+    # 7. 执行发布
+    # 8. 返回文章链接
+```
 
 ## 前端页面说明
 

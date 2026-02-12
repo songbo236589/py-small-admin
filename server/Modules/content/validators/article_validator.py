@@ -13,11 +13,11 @@ class ArticleAddUpdateRequest(BaseModel):
     """文章添加和更新请求模型"""
 
     title: str = Field(..., description="文章标题")
-    content: str = Field(..., description="文章内容（Markdown格式）")
+    content: str = Field(..., description="文章内容（HTML格式）")
     summary: str | None = Field(None, description="文章摘要")
     cover_image_id: int | None = Field(None, description="封面图片ID")
     category_id: int | None = Field(None, description="分类ID")
-    tag_ids: list[int] | None = Field(None, description="标签ID列表")
+    tag_ids: str | int | list[int] | None = Field(None, description="标签ID列表")
     status: int = Field(0, description="状态")
 
     @field_validator("title")
@@ -58,7 +58,7 @@ class ArticleAddUpdateRequest(BaseModel):
             raise ValueError("状态值只能为0、1、2或3（0=草稿, 1=已发布, 2=审核中, 3=发布失败）")
         return v
 
-    @field_validator("tag_ids")
+    @field_validator("tag_ids", mode="before")
     @classmethod
     def validate_tag_ids(cls, v):
         """验证标签ID列表"""

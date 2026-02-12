@@ -119,16 +119,19 @@ const Popup: React.FC = () => {
         ),
       }));
 
-      const cookieData = cookies.map((cookie) => ({
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path,
-        secure: cookie.secure,
-        httpOnly: cookie.httpOnly,
-        expirationDate: cookie.expirationDate,
-        storeId: cookie.storeId,
-      }));
+      const cookieData = {
+        cookies: cookies.map((cookie) => ({
+          name: cookie.name,
+          value: cookie.value,
+          domain: cookie.domain,
+          path: cookie.path,
+          secure: cookie.secure,
+          httpOnly: cookie.httpOnly,
+          expirationDate: cookie.expirationDate,
+          storeId: cookie.storeId,
+        })),
+        userAgent: navigator.userAgent,
+      };
 
       await axios.post(`${state.apiBaseUrl}/api/content/extension/platform_account/import_cookies`, cookieData);
 

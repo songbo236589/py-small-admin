@@ -18,7 +18,11 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:chrome:*)",
-      "Bash(zip:*)"
+      "Bash(zip:*)",
+      "Bash(pip install:*)",
+      "Bash(C:ProgramDataAnaconda3envstemp312python.exe:*)",
+      "Bash(/c/ProgramData/Anaconda3/envs/temp312/python.exe:*)",
+      "Bash(grep:*)"
     ]
   }
 }

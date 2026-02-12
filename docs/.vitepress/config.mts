@@ -153,6 +153,12 @@ function createSidebar() {
           ],
         },
         {
+          text: '工具指南',
+          items: [
+            { text: '浏览器扩展', link: 'browser-extension' },
+          ],
+        },
+        {
           text: '命令行工具',
           items: [
             { text: '工具概览', link: 'cli-commands/' },
@@ -183,6 +189,7 @@ function createSidebar() {
                 { text: 'API 开发规范', link: 'backend/api/' },
                 { text: 'Admin 模块 API', link: 'backend/api/admin-api' },
                 { text: 'Quant 模块 API', link: 'backend/api/quant-api' },
+                { text: 'Content 模块 API', link: 'backend/api/content-api' },
                 { text: '认证授权', link: 'backend/api/authentication' },
               ],
             },
@@ -200,6 +207,8 @@ function createSidebar() {
                 { text: '日志系统', link: 'backend/features/log' },
                 { text: '数据验证', link: 'backend/features/validation' },
                 { text: '异常处理', link: 'backend/features/exception' },
+                { text: '浏览器自动化', link: 'backend/features/browser' },
+                { text: '内容发布', link: 'backend/features/content-publish' },
               ],
             },
             { text: '配置系统',

@@ -10,6 +10,7 @@ from .content_article_tag import ContentArticleTag
 from .content_article import ContentArticle
 from .content_platform_account import ContentPlatformAccount
 from .content_publish_log import ContentPublishLog
+from .content_topic import ContentTopic
 
 __all__ = [
     "ContentArticle",
@@ -18,4 +19,5 @@ __all__ = [
     "ContentArticleTag",
     "ContentPlatformAccount",
     "ContentPublishLog",
+    "ContentTopic",
 ]

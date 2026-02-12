@@ -49,13 +49,17 @@ class ExtensionService:
         return success(data=platforms, message="获取成功")
 
     async def import_cookies(
-        self, cookies_data: list[dict[str, Any]], user_id: int = 0
+        self,
+        cookies_data: list[dict[str, Any]],
+        user_id: int = 0,
+        user_agent: str | None = None,
     ) -> JSONResponse:
         """从浏览器扩展导入Cookies
 
         Args:
             cookies_data: Cookie数据列表
             user_id: 当前用户ID
+            user_agent: 浏览器 User-Agent（从浏览器扩展获取）
 
         Returns:
             导入结果
@@ -98,6 +102,8 @@ class ExtensionService:
                 if account:
                     # 更新现有账号
                     account.cookies = cookies_json
+                    if user_agent:  # 更新 User-Agent（如果提供了）
+                        account.user_agent = user_agent
                     account.last_verified = now()
                     account.status = 1  # 标记为有效
                     account.updated_at = now()
@@ -118,7 +124,7 @@ class ExtensionService:
                         platform=platform,
                         account_name=account_name or f"{platform}_账号",
                         cookies=cookies_json,
-                        user_agent=self._get_default_user_agent(),
+                        user_agent=user_agent,  # 使用浏览器扩展获取的 UA
                         status=1,
                         last_verified=now(),
                         created_by=user_id,
@@ -191,14 +197,3 @@ class ExtensionService:
                 # 使用Cookie名称的前8位作为标识
                 return f"{platform}_{cookie.get('name', 'user')[:8]}"
         return None
-
-    def _get_default_user_agent(self) -> str:
-        """获取默认User-Agent
-
-        Returns:
-            User-Agent字符串
-        """
-        return (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        )

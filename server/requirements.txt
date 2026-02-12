@@ -126,3 +126,19 @@ fastapi-mail==1.5.9
 # AkShare - 金融数据接口库
 # 用于获取股票、基金、期货等金融数据，支持多种数据源
 akshare==1.18.21
+
+# ========== 浏览器自动化相关依赖 ==========
+
+# Playwright - 浏览器自动化库
+# 用于实现浏览器自动化操作，支持 Cookie 验证和文章发布功能
+playwright==1.58.0
+
+# Markdownify - HTML 转 Markdown 库
+# 用于将富文本编辑器生成的 HTML 转换为 Markdown 格式，便于发布到支持 Markdown 的平台
+markdownify==1.2.2
+
+# ========== AI 相关依赖 ==========
+
+# HTTPX - 异步 HTTP 客户端库
+# 用于调用 Ollama AI 服务 API，支持 HTTP/2 和异步请求
+httpx==0.28.1

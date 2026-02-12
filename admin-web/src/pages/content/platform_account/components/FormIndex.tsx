@@ -56,14 +56,14 @@ const FormIndex: React.FC<PorpsType> = (props) => {
         destroyOnClose: true,
       }}
       submitter={{
-        render: (props, defaultDoms) => {
+        render: (submitterProps, defaultDoms) => {
           return [
             ...defaultDoms,
             <Button
               loading={loading ? false : true}
               key="extra-reset"
               onClick={async () => {
-                const id = props.form?.getFieldValue('id');
+                const id = submitterProps.form?.getFieldValue('id');
                 if (id) {
                   await setLoading(false);
                   const res = await edit(id);
@@ -72,7 +72,7 @@ const FormIndex: React.FC<PorpsType> = (props) => {
                     await setLoading(true);
                   }
                 } else {
-                  props.reset();
+                  submitterProps.reset();
                 }
               }}
             >

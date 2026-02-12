@@ -1,19 +1,26 @@
 # 创建 FastAPI 应用实例，使用配置系统
 
+import asyncio
 import os
+import sys
+
+# Windows 系统下使用 SelectorEventLoop 以支持 Playwright 子进程
+# 修复 NotImplementedError: ProactorEventLoop 不支持创建子进程
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
-from Modules.admin.routes import main_router as admin_router
+from Modules.admin.routers import main_router as admin_router
 from Modules.common.libs.app import lifespan
 from Modules.common.libs.config import Config, ConfigRegistry
 from Modules.common.libs.exception import register_exception_handlers
 from Modules.common.libs.responses.response import success
-from Modules.content.routes import main_router as content_router
-from Modules.quant.routes import main_router as quant_router
+from Modules.content.routers import main_router as content_router
+from Modules.quant.routers import main_router as quant_router
 
 # 应用启动时加载一次
 ConfigRegistry.load()

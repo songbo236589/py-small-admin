@@ -1,5 +1,5 @@
 """
-Admin 模块路由包
+Content模块路由包
 """
 
 from fastapi import APIRouter, Depends
@@ -7,29 +7,25 @@ from fastapi.security import APIKeyHeader, HTTPBearer
 
 # 导入权限中间件
 from Modules.admin.middleware import require_authentication
-from Modules.admin.routes.admin import router as router_admin
-from Modules.admin.routes.common import router as router_common
-from Modules.admin.routes.email import router as router_email
-from Modules.admin.routes.group import router as router_group
-from Modules.admin.routes.rule import router as router_rule
-from Modules.admin.routes.sys_config import router as router_sys_config
-from Modules.admin.routes.upload import router as router_upload
+
+from .ai import router as router_ai
+from .article import router as router_article
+from .category import router as router_category
+from .extension import extension_router
+from .platform_account import router as router_platform_account
+from .publish import router as router_publish
+from .tag import router as router_tag
+from .topic import router as router_topic
 
 # 创建主路由器
-main_router = APIRouter(prefix="/admin")
+main_router = APIRouter(prefix="/content")
 bearer_security = HTTPBearer()
 api_key_security = APIKeyHeader(name="X-API-Key")
 
 
-# 验证码路由 - 不需要认证
+# 文章管理路由 - 需要认证
 main_router.include_router(
-    router_common,
-    dependencies=[Depends(api_key_security), Depends(require_authentication())],
-)
-
-# 管理员管理路由 - 需要用户管理权限
-main_router.include_router(
-    router_admin,
+    router_article,
     dependencies=[
         Depends(bearer_security),
         Depends(api_key_security),
@@ -37,9 +33,9 @@ main_router.include_router(
     ],
 )
 
-# 角色管理路由 - 需要用户管理权限
+# 分类管理路由 - 需要认证
 main_router.include_router(
-    router_group,
+    router_category,
     dependencies=[
         Depends(bearer_security),
         Depends(api_key_security),
@@ -47,27 +43,9 @@ main_router.include_router(
     ],
 )
 
-# 菜单管理路由 - 需要用户管理权限
+# 标签管理路由 - 需要认证
 main_router.include_router(
-    router_rule,
-    dependencies=[
-        Depends(bearer_security),
-        Depends(api_key_security),
-        Depends(require_authentication()),
-    ],
-)
-# 系统配置路由 - 需要用户管理权限
-main_router.include_router(
-    router_sys_config,
-    dependencies=[
-        Depends(bearer_security),
-        Depends(api_key_security),
-        Depends(require_authentication()),
-    ],
-)
-# 系统文件路由 - 需要用户管理权限
-main_router.include_router(
-    router_upload,
+    router_tag,
     dependencies=[
         Depends(bearer_security),
         Depends(api_key_security),
@@ -75,13 +53,48 @@ main_router.include_router(
     ],
 )
 
-# 邮件管理路由 - 需要用户管理权限
+# 平台账号管理路由 - 需要认证
 main_router.include_router(
-    router_email,
+    router_platform_account,
     dependencies=[
         Depends(bearer_security),
         Depends(api_key_security),
         Depends(require_authentication()),
     ],
 )
+
+# 发布管理路由 - 需要认证
+main_router.include_router(
+    router_publish,
+    dependencies=[
+        Depends(bearer_security),
+        Depends(api_key_security),
+        Depends(require_authentication()),
+    ],
+)
+
+# 话题管理路由 - 需要认证
+main_router.include_router(
+    router_topic,
+    dependencies=[
+        Depends(bearer_security),
+        Depends(api_key_security),
+        Depends(require_authentication()),
+    ],
+)
+
+# AI 生成路由 - 需要认证
+main_router.include_router(
+    router_ai,
+    dependencies=[
+        Depends(bearer_security),
+        Depends(api_key_security),
+        Depends(require_authentication()),
+    ],
+)
+
+# 浏览器扩展路由 - 公开接口（不需要认证）
+main_router.include_router(extension_router)
+
+
 __all__ = ["main_router"]

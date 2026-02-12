@@ -15,7 +15,7 @@ controller = PublishController()
 
 
 router.post(
-    "/article/{id}",
+    "/article/{article_id}",
     response_model=dict[str, Any],
     summary="发布文章到指定平台",
 )(controller.publish_article)
@@ -47,3 +47,17 @@ router.put(
     response_model=dict[str, Any],
     summary="重试失败发布",
 )(controller.retry)
+
+
+router.delete(
+    "/destroy/{id}",
+    response_model=dict[str, Any],
+    summary="删除发布记录",
+)(controller.destroy)
+
+
+router.delete(
+    "/destroy_all",
+    response_model=dict[str, Any],
+    summary="批量删除发布记录",
+)(controller.destroy_all)

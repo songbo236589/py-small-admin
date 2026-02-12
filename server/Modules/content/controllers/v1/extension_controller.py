@@ -27,12 +27,23 @@ class ExtensionController:
 
     async def import_cookies(
         self,
-        cookies_data: list[dict[str, Any]] = Body(..., description="Cookie数据列表"),
+        data: dict[str, Any] = Body(..., description="Cookie数据和User-Agent"),
     ) -> JSONResponse:
         """从浏览器扩展导入Cookies
 
         接收浏览器扩展发送的Cookie数据，自动识别平台并更新或创建平台账号。
+
+        Args:
+            data: 包含 cookies 和 userAgent 的字典
+                {
+                    "cookies": [...],  # Cookie 数组
+                    "userAgent": "Mozilla/5.0..."  # 浏览器 User-Agent
+                }
         """
+        cookies_data = data.get("cookies", [])
+        user_agent = data.get("userAgent")
         # TODO: 从认证信息中获取当前用户ID
         user_id = 1  # 暂时使用固定用户ID
-        return await self.extension_service.import_cookies(cookies_data, user_id)
+        return await self.extension_service.import_cookies(
+            cookies_data, user_id, user_agent
+        )

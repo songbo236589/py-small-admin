@@ -13,7 +13,7 @@ class PublishArticleRequest(BaseModel):
     """发布文章请求模型"""
 
     platform: str = Field(..., description="发布平台：zhihu")
-    account_id: int = Field(..., description="平台账号ID")
+    platform_account_id: int = Field(..., description="平台账号ID")
     article_id: int | None = Field(None, description="文章ID（单篇发布）")
     article_ids: list[int] | None = Field(None, description="文章ID列表（批量发布）")
 
@@ -29,9 +29,9 @@ class PublishArticleRequest(BaseModel):
             raise ValueError(f"不支持的平台，支持的平台有: {', '.join(supported_platforms)}")
         return v
 
-    @field_validator("account_id")
+    @field_validator("platform_account_id")
     @classmethod
-    def validate_account_id(cls, v):
+    def validate_platform_account_id(cls, v):
         """验证平台账号ID"""
         if v <= 0:
             raise ValueError("平台账号ID必须大于0")
@@ -78,6 +78,7 @@ class PublishBatchRequest(BaseModel):
     """批量发布请求模型"""
 
     platform: str = Field(..., description="发布平台")
+    platform_account_id: int = Field(..., description="平台账号ID")
     article_ids: list[int] = Field(..., description="文章ID列表")
 
     @field_validator("platform")
@@ -90,6 +91,14 @@ class PublishBatchRequest(BaseModel):
         supported_platforms = ["zhihu"]
         if v not in supported_platforms:
             raise ValueError(f"不支持的平台，支持的平台有: {', '.join(supported_platforms)}")
+        return v
+
+    @field_validator("platform_account_id")
+    @classmethod
+    def validate_platform_account_id(cls, v):
+        """验证平台账号ID"""
+        if v <= 0:
+            raise ValueError("平台账号ID必须大于0")
         return v
 
     @field_validator("article_ids")

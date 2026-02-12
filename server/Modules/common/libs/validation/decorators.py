@@ -45,7 +45,11 @@ def validate_request_data(request_model_class: type) -> Callable:
 
             # 使用Pydantic模型验证数据
             try:
-                request_model_class(**data_dict)
+                validated_instance = request_model_class(**data_dict)
+                # 用验证后的数据更新 kwargs
+                for field_name in model_fields:
+                    if field_name in validated_instance.model_fields_set or field_name in data_dict:
+                        kwargs[field_name] = getattr(validated_instance, field_name)
             except PydanticValidationError as e:
                 # 处理SQLModel验证错误，提取用户友好的错误信息
                 error_messages = []

@@ -2,6 +2,7 @@
 Content 平台账号服务 - 负责平台账号相关的业务逻辑
 """
 
+import json
 from typing import Any
 
 from fastapi.encoders import jsonable_encoder
@@ -15,6 +16,7 @@ from Modules.common.libs.time.utils import format_datetime, now
 from Modules.common.libs.validation.pagination_validator import CustomParams
 from Modules.common.services.base_service import BaseService
 from Modules.content.models.content_platform_account import ContentPlatformAccount
+from Modules.content.services.publisher import ZhihuHandler
 
 
 class PlatformAccountService(BaseService):
@@ -192,8 +194,13 @@ class PlatformAccountService(BaseService):
         return await self.common_destroy(id=id, model_class=ContentPlatformAccount)
 
     async def verify(self, id: int) -> JSONResponse:
-        """验证平台账号Cookie有效性"""
+        """验证平台账号 Cookie 有效性"""
+        import time
+
+        from Modules.common.libs.config.registry import ConfigRegistry
+
         async with get_async_session() as session:
+            # 1. 获取账号
             result = await session.execute(
                 select(ContentPlatformAccount).where(ContentPlatformAccount.id == id)
             )
@@ -202,13 +209,46 @@ class PlatformAccountService(BaseService):
             if not account:
                 return error("平台账号不存在")
 
-            # TODO: 实现实际的Cookie验证逻辑
-            # 这里需要根据不同平台实现不同的验证方式
-            # 例如：使用Playwright访问平台页面，检查是否能正常登录
+            # ✅ 反检测：检查验证间隔，防止频繁验证
+            config = ConfigRegistry.get("content")
+            if config is not None and account.last_verified:
+                elapsed = int(time.time()) - int(account.last_verified.timestamp())
+                min_interval = config.verify_interval_min
 
-            # 暂时只更新验证时间
+                if elapsed < min_interval:
+                    remaining = min_interval - elapsed
+                    return error(
+                        f"验证过于频繁，请等待 {remaining} 秒后再试"
+                    )
+
+            # 2. 解析 Cookies
+            try:
+                cookies = json.loads(account.cookies)
+            except json.JSONDecodeError:
+                return error("Cookie 格式错误，无法解析")
+
+            # 3. 获取对应的处理器（使用融合后的 Handler）
+            handlers = {
+                "zhihu": ZhihuHandler,
+            }
+
+            handler_class = handlers.get(account.platform)
+            if not handler_class:
+                return error(f"不支持的平台: {account.platform}")
+
+            # 4. 执行验证（使用 Handler 的 verify 方法）
+            try:
+                handler = handler_class(
+                    cookies=cookies,
+                    user_agent=account.user_agent,  # type: ignore
+                )
+                result = await handler.verify()
+            except Exception as e:
+                return error(f"验证过程出错: {str(e)}")
+
+            # 5. 更新状态
             account.last_verified = now()
-            account.status = 1  # 假设验证成功
+            account.status = 1 if result["success"] else 0
             await session.commit()
 
             return success(
@@ -218,6 +258,6 @@ class PlatformAccountService(BaseService):
                     "account_name": account.account_name,
                     "status": account.status,
                     "last_verified": format_datetime(account.last_verified),
-                    "message": "Cookie验证成功",
+                    "message": result["message"],
                 }
             )

@@ -1,11 +1,11 @@
-import { ProTableWrapper } from '@/components';
-import { getLogs, retry } from '@/services/content/publish/api';
+import { CDel, CDelAll, ProTableWrapper } from '@/components';
+import { destroy, destroyAll, getLogs, retry } from '@/services/content/publish/api';
 import { exportExcel } from '@/utils/exportExcel';
 import { getSort, setLsetData } from '@/utils/utils';
+import { RedoOutlined } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { useModel } from '@umijs/max';
 import { Badge, Button, message, Space, Tag } from 'antd';
-import { RedoOutlined } from '@ant-design/icons';
 import React, { useRef, useState } from 'react';
 
 // 平台选项映射
@@ -129,12 +129,7 @@ const Index: React.FC = () => {
       hideInSearch: true,
       width: 200,
       ellipsis: true,
-      render: (_, record) => {
-        if (record.error_message) {
-          return <span style={{ color: '#ff4d4f' }}>{record.error_message}</span>;
-        }
-        return '-';
-      },
+      copyable: true,
     },
     {
       title: '重试次数',
@@ -171,7 +166,7 @@ const Index: React.FC = () => {
     {
       title: '操作',
       key: 'option',
-      width: 120,
+      width: 160,
       valueType: 'option',
       align: 'center',
       fixed: 'right',
@@ -194,6 +189,16 @@ const Index: React.FC = () => {
             重试
           </Button>
         ),
+        <CDel
+          key={`CDel-${row.id}`}
+          onCancel={async () => {
+            const res = await destroy(row.id);
+            if (res.code === 200) {
+              message.success(res.message);
+              actionRef.current?.reload();
+            }
+          }}
+        />,
       ],
     },
   ];
@@ -203,6 +208,9 @@ const Index: React.FC = () => {
       loading={loading}
       actionRef={actionRef}
       rowKey="id"
+      rowSelection={{
+        fixed: true,
+      }}
       columns={columns}
       request={async (params: API.ListQequest, sort) => {
         setLoading(true);
@@ -222,16 +230,28 @@ const Index: React.FC = () => {
         persistenceKey: 'content_publish_table_columns',
         persistenceType: 'localStorage',
       }}
-      tableAlertOptionRender={({ selectedRowKeys }) => {
+      tableAlertOptionRender={({ selectedRowKeys, selectedRows, onCleanSelected }) => {
         return (
           <Space size={16}>
+            <CDelAll
+              key={selectedRowKeys.length}
+              count={selectedRowKeys.length}
+              onCancel={async () => {
+                const res = await destroyAll({ id_array: selectedRowKeys as number[] });
+                if (res.code === 200) {
+                  message.success(res.message);
+                  actionRef.current?.reload();
+                  onCleanSelected();
+                }
+              }}
+            />
             <a
               onClick={() => {
                 exportExcel({
                   breadcrumbData: initialState?.breadcrumbData || [],
                   columns,
                   columnsState: maps,
-                  selectedRows: [],
+                  selectedRows,
                 });
               }}
             >

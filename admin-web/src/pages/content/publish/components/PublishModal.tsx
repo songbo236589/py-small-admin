@@ -1,5 +1,5 @@
 import { getList as getAccountList } from '@/services/content/platform_account/api';
-import { publishArticle } from '@/services/content/publish/api';
+import { publishArticle, publishBatch } from '@/services/content/publish/api';
 import { SendOutlined } from '@ant-design/icons';
 import { Button, Form, message, Modal, Select, Spin } from 'antd';
 import React, { useEffect, useState } from 'react';
@@ -56,16 +56,16 @@ const PublishModal: React.FC<PorpsType> = (props) => {
 
       let res: any;
       if (props.articleIds && props.articleIds.length > 1) {
-        // 批量发布
-        res = await publishArticle({
-          article_ids: props.articleIds,
+        // 批量发布 (article_ids 转为逗号分隔的字符串)
+        res = await publishBatch({
+          article_ids: props.articleIds.join(','),
           platform: values.platform,
           platform_account_id: values.platform_account_id,
-        } as any);
+        });
       } else {
-        // 单篇发布
-        res = await publishArticle({
-          article_id: props.articleId || props.articleIds?.[0] || 0,
+        // 单篇发布 (article_id 从 URL 路径获取)
+        const articleId = props.articleId || props.articleIds?.[0] || 0;
+        res = await publishArticle(articleId, {
           platform: values.platform,
           platform_account_id: values.platform_account_id,
         });
@@ -164,7 +164,7 @@ const PublishModal: React.FC<PorpsType> = (props) => {
 
             {accountOptions.length === 0 && platform && (
               <div style={{ color: '#ff4d4f', marginTop: '-16px', marginBottom: '16px' }}>
-                该平台暂无有效账号，请先在"平台账号"中添加账号
+                该平台暂无有效账号，请先在「平台账号」中添加账号
               </div>
             )}
           </Form>

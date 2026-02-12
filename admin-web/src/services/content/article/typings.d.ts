@@ -24,7 +24,7 @@ declare namespace API {
     summary: string | null;
     cover_image_id: number | null;
     category_id: number | null;
-    tag_ids: number[];
+    tag_ids: number[] | string; // 表单使用 number[]，API 使用 string (逗号分隔)
     status: 0 | 1 | 2 | 3;
   };
 

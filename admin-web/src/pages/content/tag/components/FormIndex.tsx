@@ -1,9 +1,9 @@
 import { add, edit, update } from '@/services/content/tag/api';
 import { FormOutlined, PlusOutlined } from '@ant-design/icons';
 import type { ProFormInstance } from '@ant-design/pro-components';
+import { DrawerForm } from '@ant-design/pro-components';
 import { Button, ColorPicker, Form, Input, InputNumber, message, Radio, Spin } from 'antd';
 import React, { useRef, useState } from 'react';
-import { DrawerForm } from '@ant-design/pro-components';
 
 interface PorpsType {
   onConfirm: () => void;
@@ -51,14 +51,14 @@ const FormIndex: React.FC<PorpsType> = (props) => {
         destroyOnClose: true,
       }}
       submitter={{
-        render: (props, defaultDoms) => {
+        render: (submitterProps, defaultDoms) => {
           return [
             ...defaultDoms,
             <Button
               loading={loading ? false : true}
               key="extra-reset"
               onClick={async () => {
-                const id = props.form?.getFieldValue('id');
+                const id = submitterProps.form?.getFieldValue('id');
                 if (id) {
                   await setLoading(false);
                   const res = await edit(id);
@@ -67,7 +67,7 @@ const FormIndex: React.FC<PorpsType> = (props) => {
                     await setLoading(true);
                   }
                 } else {
-                  props.reset();
+                  submitterProps.reset();
                 }
               }}
             >
@@ -130,12 +130,7 @@ const FormIndex: React.FC<PorpsType> = (props) => {
             </Form.Item>
 
             <Form.Item label="标签颜色" name="color">
-              <ColorPicker
-                showText
-                format="hex"
-                placeholder="请选择标签颜色"
-                style={{ width: '100%' }}
-              />
+              <ColorPicker showText format="hex" style={{ width: '100%' }} />
             </Form.Item>
 
             <Form.Item label="排序" name="sort">

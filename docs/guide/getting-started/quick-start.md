@@ -4,6 +4,15 @@
 
 ## 启动项目
 
+::: warning Windows 用户注意事项
+如果您使用的是 Windows 系统，在使用平台账号验证功能前，请确保：
+
+1. 将 `.env` 文件中的 `APP_RELOAD` 设置为 `false`
+2. 使用 `python run.py` 启动服务（不要使用 `uvicorn` 命令直接启动）
+
+详细说明请参考 [浏览器自动化功能文档](../backend/features/browser.md#windows-系统特殊配置)。
+:::
+
 ### 1. 启动后端服务
 
 ```bash

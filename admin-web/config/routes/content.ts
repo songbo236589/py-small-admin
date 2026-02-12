@@ -24,6 +24,10 @@ export default [
     component: './content/platform_account/index',
   },
   {
+    path: '/content/manage/topic',
+    component: './content/topic/index',
+  },
+  {
     path: '/content/manage/publish',
     component: './content/publish/index',
   },

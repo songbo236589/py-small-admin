@@ -54,6 +54,100 @@ pip install -r requirements.txt
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
+### 4.1 安装 Playwright 浏览器（可选）
+
+如果需要使用内容发布功能（自动发布文章到知乎等平台），需要安装 Playwright 浏览器：
+
+```bash
+# 下载 Chromium 浏览器
+playwright install chromium
+```
+
+**关于 Playwright**：
+- Playwright 是一个浏览器自动化工具，用于模拟真实浏览器操作
+- 支持 Cookie 验证、文章自动发布等功能
+- 浏览器文件约 300-500 MB，下载到用户目录
+
+**可选安装**：
+- 如果不需要内容发布功能，可以跳过此步骤
+- 支持的其他浏览器：`playwright install firefox`、`playwright install webkit`
+
+**查看已安装的浏览器**：
+```bash
+playwright show-browsers
+```
+
+**使用国内镜像（下载失败时）**：
+```bash
+# 设置环境变量
+export PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright/
+playwright install chromium
+```
+
+### 4.2 安装 Ollama（可选）
+
+如果需要使用 AI 生成文章功能，需要安装 Ollama 服务。
+
+#### 1. 安装 Ollama
+
+**macOS/Linux:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+**Windows:**
+- 下载安装包：https://ollama.com/download
+- 运行安装程序
+
+#### 2. 启动 Ollama 服务
+
+安装后会自动启动，验证服务是否运行：
+
+```bash
+ollama list
+```
+
+#### 3. 拉取模型
+
+下载 AI 模型（默认使用 qwen2.5:7b）：
+
+```bash
+ollama pull qwen2.5:7b
+```
+
+其他推荐模型：
+- `ollama pull qwen2.5:14b` - 更大更准确
+- `ollama pull llama3.2:8b` - Meta 的模型
+
+#### 4. 验证安装
+
+测试模型是否可用：
+
+```bash
+ollama run qwen2.5:7b "你好"
+```
+
+#### 5. 配置环境变量
+
+在 `.env` 文件中配置（可选，有默认值）：
+
+```bash
+CONTENT_OLLAMA_BASE_URL=http://localhost:11434
+CONTENT_OLLAMA_MODEL=qwen2.5:7b
+CONTENT_OLLAMA_TIMEOUT=120
+CONTENT_OLLAMA_ENABLED=true
+```
+
+**关于 Ollama**：
+- Ollama 是一个本地运行大语言模型的工具
+- 支持多种开源模型（Llama、Qwen、Mistral 等）
+- 模型文件约 4-10 GB，占用较大空间
+- 默认监听端口：11434
+
+**可选安装**：
+- 如果不需要 AI 生成功能，可以跳过此步骤
+- 更多模型请参考：https://ollama.com/library
+
 ### 5. 配置环境变量
 
 复制示例配置文件：
@@ -71,6 +165,14 @@ APP_DEBUG=True
 APP_HOST=0.0.0.0
 APP_PORT=8000
 APP_RELOAD=True
+
+::: warning Windows 用户注意
+如果需要在 Windows 上使用平台账号验证功能（Playwright 浏览器自动化）：
+- 请将 `APP_RELOAD` 设置为 `false`
+- 使用 `python run.py` 启动服务
+- 详细说明请参考 [浏览器自动化功能文档](../backend/features/browser.md#windows-系统特殊配置)
+:::
+
 APP_API_PREFIX=/api
 APP_TIMEZONE=Asia/Shanghai
 APP_ADMIN_X_API_KEY=your-admin-api-key
@@ -123,6 +225,22 @@ QINIU_ACCESS_KEY=
 QINIU_SECRET_KEY=
 QINIU_BUCKET=
 QINIU_DOMAIN=
+
+# 内容模块配置（可选）
+# Playwright 浏览器自动化
+CONTENT_PLAYWRIGHT_HEADLESS=True
+CONTENT_PLAYWRIGHT_TIMEOUT=30000
+CONTENT_PLAYWRIGHT_WIDTH=1920
+CONTENT_PLAYWRIGHT_HEIGHT=1080
+
+# 知乎平台配置
+CONTENT_ZHIHU_VERIFY_URL=https://www.zhihu.com
+CONTENT_ZHIHU_LOGIN_SELECTOR=.AppHeader-login
+CONTENT_ZHIHU_LOGGED_IN_SELECTOR=.AppHeader-notifications
+
+# Cookie 验证配置
+CONTENT_COOKIE_VERIFY_INTERVAL=3600
+CONTENT_COOKIE_EXPIRE_WARNING_DAYS=7
 ```
 
 **重要提示**：在生产环境中，请务必修改以下敏感配置：

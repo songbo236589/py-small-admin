@@ -1,5 +1,5 @@
 import { CDel, CDelAll, ProTableWrapper } from '@/components';
-import { destroy, destroyAll, getList, setStatus } from '@/services/content/article/api';
+import { destroy, destroyAll, getList } from '@/services/content/article/api';
 import { getTree as getCategoryTree } from '@/services/content/category/api';
 import { getList as getTagList } from '@/services/content/tag/api';
 import { exportExcel } from '@/utils/exportExcel';
@@ -8,13 +8,12 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { useModel } from '@umijs/max';
 import { Badge, message, Space, Tag } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
-import FormIndex from './components/FormIndex';
 import PublishModal from '../publish/components/PublishModal';
+import FormIndex from './components/FormIndex';
 
 const Index: React.FC = () => {
   const actionRef = useRef<ActionType>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [categoryTreeData, setCategoryTreeData] = useState<any[]>([]);
   const [tagOptions, setTagOptions] = useState<{ label: string; value: number }[]>([]);
   const { initialState } = useModel('@@initialState');
@@ -75,12 +74,12 @@ const Index: React.FC = () => {
       },
       fieldProps: {
         treeDefaultExpandAll: true,
-        treeData:categoryTreeData,
+        treeData: categoryTreeData,
         showSearch: true,
         fieldNames: { label: 'title', value: 'value', children: 'children' },
-        filterTreeNode:(input: string, treeNode: { title: string; }) => {
+        filterTreeNode: (input: string, treeNode: { title: string }) => {
           return (treeNode.title as string)?.toLowerCase().includes(input.toLowerCase());
-        }
+        },
       },
     },
     {
@@ -282,10 +281,6 @@ const Index: React.FC = () => {
       rowKey="id"
       rowSelection={{
         fixed: true,
-        selectedRowKeys,
-        onChange: (selectedRowKeys) => {
-          setSelectedRowKeys(selectedRowKeys);
-        },
       }}
       columns={columns}
       request={async (params: API.ListQequest, sort) => {
@@ -306,12 +301,12 @@ const Index: React.FC = () => {
         persistenceKey: 'content_article_table_columns',
         persistenceType: 'localStorage',
       }}
-      tableAlertOptionRender={({ selectedRowKeys, onCleanSelected }) => {
+      tableAlertOptionRender={({ selectedRowKeys, selectedRows, onCleanSelected }) => {
         return (
           <Space size={16}>
             <PublishModal
               key="batchPublish"
-              articleIds={selectedRowKeys}
+              articleIds={selectedRowKeys as number[]}
               onConfirm={() => {
                 actionRef.current?.reload();
                 onCleanSelected();
@@ -321,7 +316,7 @@ const Index: React.FC = () => {
               key={selectedRowKeys.length}
               count={selectedRowKeys.length}
               onCancel={async () => {
-                const res = await destroyAll({ id_array: selectedRowKeys });
+                const res = await destroyAll({ id_array: selectedRowKeys as number[] });
                 if (res.code === 200) {
                   message.success(res.message);
                   actionRef.current?.reload();
@@ -335,7 +330,7 @@ const Index: React.FC = () => {
                   breadcrumbData: initialState?.breadcrumbData || [],
                   columns,
                   columnsState: maps,
-                  selectedRows: [],
+                  selectedRows,
                 });
               }}
             >

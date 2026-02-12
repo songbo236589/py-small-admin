@@ -2,6 +2,7 @@
 Content 发布服务 - 负责文章发布相关的业务逻辑
 """
 
+import json
 from typing import Any
 
 from fastapi.encoders import jsonable_encoder
@@ -11,12 +12,13 @@ from sqlmodel import select
 
 from Modules.common.libs.database.sql.session import get_async_session
 from Modules.common.libs.responses.response import error, success
-from Modules.common.libs.time.utils import format_datetime
+from Modules.common.libs.time.utils import format_datetime, now
 from Modules.common.libs.validation.pagination_validator import CustomParams
 from Modules.common.services.base_service import BaseService
 from Modules.content.models.content_article import ContentArticle
 from Modules.content.models.content_platform_account import ContentPlatformAccount
 from Modules.content.models.content_publish_log import ContentPublishLog
+from Modules.content.services.publisher import ZhihuHandler
 
 
 class PublishService(BaseService):
@@ -29,13 +31,13 @@ class PublishService(BaseService):
         """发布单篇文章到指定平台
 
         Args:
-            data: 包含 platform, account_id, article_id 的字典
+            data: 包含 platform, platform_account_id, article_id 的字典
 
         Returns:
             JSONResponse: 发布结果
         """
         platform = data.get("platform")
-        account_id = data.get("account_id", 0)
+        platform_account_id = data.get("platform_account_id", 0)
         article_id = data.get("article_id", 0)
 
         async with get_async_session() as session:
@@ -50,7 +52,7 @@ class PublishService(BaseService):
             # 验证平台账号是否存在且匹配
             account_result = await session.execute(
                 select(ContentPlatformAccount).where(
-                    ContentPlatformAccount.id == account_id,
+                    ContentPlatformAccount.id == platform_account_id,
                     ContentPlatformAccount.platform == platform,
                 )
             )
@@ -76,39 +78,86 @@ class PublishService(BaseService):
                 article_id=article_id,
                 platform=platform,  # type: ignore
                 status=0,  # 待发布
+                created_at=now(),  # 设置创建时间
             )
             session.add(publish_log)
             await session.commit()
             await session.refresh(publish_log)
 
-            # TODO: 创建异步发布任务
-            # 这里需要调用 Celery 任务队列进行异步发布
-            # 示例：
-            # from Modules.content.queues.publish_queue import publish_article_task
-            # task = publish_article_task.delay(publish_log.id, article_id, platform, account_id)
-            # publish_log.task_id = task.id
-            # await session.commit()
+            # 执行发布操作
+            try:
+                # 更新状态为发布中
+                publish_log.status = 1  # 发布中
+                await session.commit()
 
-            return success(
-                {
-                    "log_id": publish_log.id,
-                    "article_id": article_id,
-                    "platform": platform,
-                    "status": publish_log.status,
-                    "message": "发布任务已创建，正在排队处理",
+                # 准备文章数据
+                article_data = {
+                    "title": article.title,
+                    "content": article.content or "",
+                    "summary": article.summary or "",
                 }
-            )
+
+                # 解析 Cookies
+                cookies = json.loads(account.cookies) if account.cookies else []
+                user_agent = account.user_agent
+
+                # 根据平台选择处理器（使用融合后的 Handler）
+                handler = None
+                if platform == "zhihu":
+                    handler = ZhihuHandler(
+                        cookies=cookies,
+                        user_agent=user_agent,
+                        article_data=article_data,
+                    )
+                else:
+                    return error(f"不支持的平台: {platform}")
+
+                # 执行发布
+                result = await handler.publish()
+
+                # 更新发布结果
+                if result.success:
+                    publish_log.status = 2  # 成功
+                    publish_log.platform_article_id = result.platform_article_id
+                    publish_log.platform_url = result.platform_url
+                    publish_log.error_message = None
+                else:
+                    publish_log.status = 3  # 失败
+                    publish_log.error_message = result.message[:500]  # 限制错误信息长度
+
+                await session.commit()
+
+                return success(
+                    {
+                        "log_id": publish_log.id,
+                        "article_id": article_id,
+                        "platform": platform,
+                        "status": publish_log.status,
+                        "platform_article_id": publish_log.platform_article_id,
+                        "platform_url": publish_log.platform_url,
+                        "message": result.message,
+                    }
+                )
+
+            except Exception as e:
+                # 发布失败，更新日志状态
+                publish_log.status = 3  # 失败
+                publish_log.error_message = f"发布异常: {str(e)}"[:500]
+                await session.commit()
+
+                return error(f"发布失败: {str(e)}")
 
     async def publish_batch(self, data: dict[str, Any]) -> JSONResponse:
         """批量发布多篇文章
 
         Args:
-            data: 包含 platform, article_ids 的字典
+            data: 包含 platform, platform_account_id, article_ids 的字典
 
         Returns:
             JSONResponse: 批量发布结果
         """
         platform = data.get("platform")
+        platform_account_id = data.get("platform_account_id", 0)
         article_ids = data.get("article_ids", [])
 
         async with get_async_session() as session:
@@ -123,17 +172,16 @@ class PublishService(BaseService):
             if len(articles) != len(article_ids):
                 return error("部分文章不存在")
 
-            # 查找该平台可用的账号
+            # 验证平台账号是否存在且匹配
             account_result = await session.execute(
                 select(ContentPlatformAccount).where(
+                    ContentPlatformAccount.id == platform_account_id,
                     ContentPlatformAccount.platform == platform,
-                    ContentPlatformAccount.status == 1,  # 有效状态
                 )
             )
-            accounts = account_result.scalars().all()
-
-            if not accounts:
-                return error("该平台没有可用的账号，请先添加平台账号")
+            account = account_result.scalar_one_or_none()
+            if not account:
+                return error("平台账号不存在或不匹配")
 
             # 创建发布日志
             logs = []
@@ -153,19 +201,16 @@ class PublishService(BaseService):
                     article_id=article_id,
                     platform=platform,  # type: ignore
                     status=0,  # 待发布
+                    created_at=now(),  # 设置创建时间
                 )
                 session.add(publish_log)
                 logs.append(publish_log)
 
             await session.commit()
 
-            # TODO: 创建批量异步发布任务
-            # 示例：
-            # from Modules.content.queues.publish_queue import publish_batch_task
-            # task = publish_batch_task.delay([log.id for log in logs], platform, account.id)
-            # for log in logs:
-            #     log.task_id = task.id
-            # await session.commit()
+            # 注意：批量发布需要异步任务队列支持（如 Celery）
+            # 目前只创建发布日志，实际发布需要通过单篇发布接口逐个执行
+            # TODO: 集成 Celery 异步任务队列实现真正的批量发布
 
             return success(
                 {
@@ -173,7 +218,7 @@ class PublishService(BaseService):
                     "created": len(logs),
                     "skipped": len(articles) - len(logs),
                     "platform": platform,
-                    "message": f"已创建 {len(logs)} 个发布任务",
+                    "message": f"已创建 {len(logs)} 个发布任务（批量发布功能开发中，请使用单篇发布）",
                 }
             )
 
@@ -300,9 +345,10 @@ class PublishService(BaseService):
             await session.commit()
 
             # TODO: 创建重试发布任务
+            # 需要获取平台账号ID或从发布日志中获取
             # 示例：
             # from Modules.content.queues.publish_queue import publish_article_task
-            # task = publish_article_task.delay(log.id, log.article_id, log.platform, account_id)
+            # task = publish_article_task.delay(log.id, log.article_id, log.platform)
             # log.task_id = task.id
             # await session.commit()
 
@@ -313,3 +359,86 @@ class PublishService(BaseService):
                     "message": "重试任务已创建",
                 }
             )
+
+    async def destroy(self, id: int) -> JSONResponse:
+        """删除发布记录
+
+        Args:
+            id: 发布记录ID
+
+        Returns:
+            JSONResponse: 删除结果
+        """
+        return await self.common_destroy(
+            id=id,
+            model_class=ContentPublishLog,
+            pre_operation_callback=self._publish_log_destroy_pre_operation,
+        )
+
+    async def _publish_log_destroy_pre_operation(
+        self, id: int, session: Any
+    ) -> tuple[Any] | JSONResponse:
+        """发布记录删除前置操作
+
+        Args:
+            id: 发布记录ID
+            session: 数据库会话
+
+        Returns:
+            验证失败时返回错误响应，成功时返回(session,)
+        """
+        # 获取发布日志
+        log_result = await session.execute(
+            select(ContentPublishLog).where(ContentPublishLog.id == id)
+        )
+        log = log_result.scalar_one_or_none()
+
+        if not log:
+            return error("发布记录不存在")
+
+        # 检查是否有正在执行的任务
+        if log.status == 1:  # 1=发布中
+            return error("无法删除正在执行中的发布任务")
+
+        return (session,)
+
+    async def destroy_all(self, id_array: list[int]) -> JSONResponse:
+        """批量删除发布记录
+
+        Args:
+            id_array: 发布记录ID数组
+
+        Returns:
+            JSONResponse: 批量删除结果
+        """
+        return await self.common_destroy_all(
+            id_array=id_array,
+            model_class=ContentPublishLog,
+            pre_operation_callback=self._publish_log_destroy_all_pre_operation,
+        )
+
+    async def _publish_log_destroy_all_pre_operation(
+        self, id_array: list[int], session: Any
+    ) -> tuple[list[int], Any] | JSONResponse:
+        """发布记录批量删除前置操作
+
+        Args:
+            id_array: 发布记录ID数组
+            session: 数据库会话
+
+        Returns:
+            验证失败时返回错误响应，成功时返回(id_array, session)
+        """
+        # 检查是否有正在执行的任务
+        running_logs = await session.execute(
+            select(ContentPublishLog.id).where(
+                ContentPublishLog.id.in_(id_array),  # type: ignore
+                ContentPublishLog.status == 1,  # 1=发布中
+            )
+        )
+        running_log_ids = running_logs.scalars().all()
+
+        if running_log_ids:
+            return error("无法删除正在执行中的发布任务")
+
+        return id_array, session

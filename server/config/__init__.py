@@ -2,6 +2,7 @@ from .app import AppConfig
 from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .celery import CeleryConfig
+from .content import ContentConfig
 from .database import DatabaseConfig
 from .jwt import JWTConfig
 from .log import LogConfig
@@ -19,4 +20,5 @@ __all__ = [
     "CaptchaConfig",
     "UploadConfig",
     "CeleryConfig",
+    "ContentConfig",
 ]

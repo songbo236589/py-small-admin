@@ -13,6 +13,9 @@
 | 日志管理 | 日志配置和使用 | [log.md](./log.md) |
 | 文件上传 | 文件上传和处理 | [upload.md](./upload.md) |
 | 数据验证 | 数据验证和校验 | [validation.md](./validation.md) |
+| 浏览器自动化 | Playwright 浏览器自动化 | [browser.md](./browser.md) |
+| 内容发布 | 文章自动发布到第三方平台 | [content-publish.md](./content-publish.md) |
+| AI 生成 | 使用 Ollama AI 生成文章内容 | [ai.md](./ai.md) |
 
 ## 缓存功能 (Cache)
 

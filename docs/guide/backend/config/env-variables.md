@@ -129,6 +129,17 @@
 | `CORS_METHODS` | 允许的方法 | * | GET,POST,PUT,DELETE |
 | `CORS_HEADERS` | 允许的头部 | * | Content-Type,Authorization |
 
+### Ollama AI 配置
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `CONTENT_OLLAMA_BASE_URL` | Ollama 服务地址 | http://localhost:11434 | http://localhost:11434 |
+| `CONTENT_OLLAMA_MODEL` | 默认使用的模型 | qwen2.5:7b | llama3.2:8b |
+| `CONTENT_OLLAMA_TIMEOUT` | AI 生成超时时间（秒） | 120 | 120 |
+| `CONTENT_OLLAMA_ENABLED` | 是否启用 AI 功能 | true | true/false |
+
+**Ollama 安装说明**：详见 [安装指南 - Ollama 安装](../../getting-started/install.md#42-安装-ollama可选)
+
 ## 配置示例
 
 ### 开发环境 (.env.development)

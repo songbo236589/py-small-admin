@@ -6,6 +6,7 @@ from config import (
     CacheConfig,
     CaptchaConfig,
     CeleryConfig,
+    ContentConfig,
     DatabaseConfig,
     JWTConfig,
     LogConfig,
@@ -80,6 +81,7 @@ class ConfigRegistry:
                 "captcha": CaptchaConfig(),
                 "upload": UploadConfig(),
                 "celery": CeleryConfig(),
+                "content": ContentConfig(),
             }
 
             cls._loaded = True

@@ -224,7 +224,7 @@ const Index: React.FC = () => {
         persistenceKey: 'content_tag_table_columns',
         persistenceType: 'localStorage',
       }}
-      tableAlertOptionRender={({ selectedRowKeys, onCleanSelected }) => {
+      tableAlertOptionRender={({ selectedRowKeys, selectedRows, onCleanSelected }) => {
         return (
           <Space size={16}>
             <CDelAll
@@ -245,7 +245,7 @@ const Index: React.FC = () => {
                   breadcrumbData: initialState?.breadcrumbData || [],
                   columns,
                   columnsState: maps,
-                  selectedRows: [],
+                  selectedRows,
                 });
               }}
             >

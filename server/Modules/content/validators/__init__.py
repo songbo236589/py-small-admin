@@ -4,6 +4,7 @@ Content验证器
 包含 content 模块的所有数据验证器。
 """
 
+from .ai_validator import AIGenerateArticleRequest
 from .article_validator import ArticleAddUpdateRequest
 from .category_validator import CategoryAddUpdateRequest
 from .platform_account_validator import PlatformAccountAddUpdateRequest
@@ -11,6 +12,7 @@ from .publish_validator import PublishArticleRequest, PublishBatchRequest, Retry
 from .tag_validator import TagAddUpdateRequest
 
 __all__ = [
+    "AIGenerateArticleRequest",
     "ArticleAddUpdateRequest",
     "CategoryAddUpdateRequest",
     "PlatformAccountAddUpdateRequest",

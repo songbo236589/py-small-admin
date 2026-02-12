@@ -173,6 +173,26 @@ def create_content_rules(session):
     session.refresh(menu3)
     print(f"✓ 创建规则: {menu3.name}")
 
+    # 话题管理菜单（level=3）
+    menu3 = AdminRule(
+        name="话题管理",
+        type=3,
+        status=1,
+        pid=menu2.id,
+        path="/content/manage/topic",
+        icon="FireOutlined",
+        redirect="",
+        component="./content/topic/index",
+        level=3,
+        sort=5,
+        target="_self",
+        created_at=now(),
+    )
+    session.add(menu3)
+    session.commit()
+    session.refresh(menu3)
+    print(f"✓ 创建规则: {menu3.name}")
+
     # 发布管理菜单（level=3）
     menu3 = AdminRule(
         name="发布管理",
@@ -184,7 +204,7 @@ def create_content_rules(session):
         redirect="",
         component="./content/publish/index",
         level=3,
-        sort=5,
+        sort=6,
         target="_self",
         created_at=now(),
     )

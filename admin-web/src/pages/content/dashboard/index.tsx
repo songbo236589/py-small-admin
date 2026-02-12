@@ -24,11 +24,13 @@ const ContentCard: React.FC<{
   const { useToken } = theme;
   const { token } = useToken();
 
+  const isExternalLink = link.startsWith('http');
   return (
     <a
       href={link}
       style={{ textDecoration: 'none' }}
-      target={link.startsWith('http') ? '_blank' : '_self'}
+      target={isExternalLink ? '_blank' : '_self'}
+      rel={isExternalLink ? 'noreferrer' : undefined}
     >
       <div
         style={{

@@ -2,10 +2,10 @@ import { CDel, CDelAll, ProTableWrapper } from '@/components';
 import { destroy, destroyAll, getList, verify } from '@/services/content/platform_account/api';
 import { exportExcel } from '@/utils/exportExcel';
 import { getSort, setLsetData } from '@/utils/utils';
+import { CheckCircleOutlined, CloudDownloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { useModel } from '@umijs/max';
-import { Alert, Badge, Button, message, Space, Tag } from 'antd';
-import { CheckCircleOutlined, CloudDownloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Alert, Badge, Button, message, Space } from 'antd';
 import React, { useRef, useState } from 'react';
 import FormIndex from './components/FormIndex';
 
@@ -190,9 +190,7 @@ const Index: React.FC = () => {
         message="浏览器登录助手"
         description={
           <Space direction="vertical" size={0}>
-            <span>
-              使用浏览器扩展可以一键获取各平台的登录信息，无需手动复制 Cookies。
-            </span>
+            <span>使用浏览器扩展可以一键获取各平台的登录信息，无需手动复制 Cookies。</span>
             <Space>
               <Button
                 type="link"
@@ -239,7 +237,7 @@ const Index: React.FC = () => {
           persistenceKey: 'content_platform_account_table_columns',
           persistenceType: 'localStorage',
         }}
-        tableAlertOptionRender={({ selectedRowKeys, onCleanSelected }) => {
+        tableAlertOptionRender={({ selectedRowKeys, selectedRows, onCleanSelected }) => {
           return (
             <Space size={16}>
               <CDelAll
@@ -260,7 +258,7 @@ const Index: React.FC = () => {
                     breadcrumbData: initialState?.breadcrumbData || [],
                     columns,
                     columnsState: maps,
-                    selectedRows: [],
+                    selectedRows,
                   });
                 }}
               >
