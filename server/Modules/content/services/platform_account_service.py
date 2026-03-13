@@ -17,6 +17,12 @@ from Modules.common.libs.validation.pagination_validator import CustomParams
 from Modules.common.services.base_service import BaseService
 from Modules.content.models.content_platform_account import ContentPlatformAccount
 from Modules.content.services.publisher import ZhihuHandler
+from Modules.content.services.publisher.toutiao_handler import (
+    ToutiaoHandler,
+)
+from Modules.content.services.publisher.xiaohongshu_handler import (
+    XiaohongshuHandler,
+)
 
 
 class PlatformAccountService(BaseService):
@@ -230,6 +236,8 @@ class PlatformAccountService(BaseService):
             # 3. 获取对应的处理器（使用融合后的 Handler）
             handlers = {
                 "zhihu": ZhihuHandler,
+                "xiaohongshu": XiaohongshuHandler,
+                "toutiao": ToutiaoHandler,
             }
 
             handler_class = handlers.get(account.platform)

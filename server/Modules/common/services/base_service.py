@@ -185,7 +185,7 @@ class BaseService:
             if post_operation_callback:
                 await post_operation_callback(instance, data, session)
 
-            return success(None, message=success_message)
+            return success({"id": instance.id}, message=success_message)
 
     async def common_update(
         self,
@@ -270,6 +270,11 @@ class BaseService:
             Awaitable[Any | JSONResponse],
         ]
         | None = None,
+        post_operation_callback: Callable[
+            [int, Any],
+            Awaitable[Any],
+        ]
+        | None = None,
     ) -> JSONResponse:
         """通用删除方法
 
@@ -277,6 +282,7 @@ class BaseService:
             id: 要删除的记录ID
             model_class: 模型类
             pre_operation_callback: 前置操作回调函数（可选）
+            post_operation_callback: 后置操作回调函数（可选）
 
         Returns:
             JSONResponse: 操作结果
@@ -302,6 +308,10 @@ class BaseService:
             await session.delete(record)
             await session.commit()
 
+            # 执行后置操作回调（如果提供）
+            if post_operation_callback:
+                await post_operation_callback(id, session)
+
             return success(None, message="删除成功")
 
     async def common_destroy_all(
@@ -313,6 +323,11 @@ class BaseService:
             Awaitable[Any | JSONResponse],
         ]
         | None = None,
+        post_operation_callback: Callable[
+            [list[int], Any],
+            Awaitable[Any],
+        ]
+        | None = None,
     ) -> JSONResponse:
         """通用批量删除方法
 
@@ -320,6 +335,7 @@ class BaseService:
             id_array: 要删除的记录ID列表
             model_class: 模型类
             pre_operation_callback: 前置操作回调函数（可选）
+            post_operation_callback: 后置操作回调函数（可选）
 
         Returns:
             JSONResponse: 操作结果
@@ -352,6 +368,10 @@ class BaseService:
                 await session.delete(record)
 
             await session.commit()
+
+            # 执行后置操作回调（如果提供）
+            if post_operation_callback:
+                await post_operation_callback(id_array, session)
 
             return success(None, message=f"成功删除{len(records)}条记录")
 

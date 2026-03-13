@@ -9,26 +9,26 @@ export default [
   },
   {
     path: '/content/manage/article',
-    component: './content/article/index',
+    component: './content/manage/article/index',
   },
   {
     path: '/content/manage/category',
-    component: './content/category/index',
+    component: './content/manage/category/index',
   },
   {
     path: '/content/manage/tag',
-    component: './content/tag/index',
+    component: './content/manage/tag/index',
   },
   {
     path: '/content/manage/platform_account',
-    component: './content/platform_account/index',
+    component: './content/manage/platform_account/index',
   },
   {
     path: '/content/manage/topic',
-    component: './content/topic/index',
+    component: './content/manage/topic/index',
   },
   {
     path: '/content/manage/publish',
-    component: './content/publish/index',
+    component: './content/manage/publish/index',
   },
 ];

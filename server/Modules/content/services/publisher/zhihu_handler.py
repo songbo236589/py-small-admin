@@ -5,12 +5,14 @@
 """
 
 import asyncio
+import json
 import random
 import re
 
 from loguru import logger
 from markdownify import markdownify as md
 
+from Modules.common.libs.config.config import Config
 from .base_platform_handler import (
     DEFAULT_USER_AGENT,
     BasePlatformHandler,
@@ -33,9 +35,7 @@ class ZhihuHandler(BasePlatformHandler):
 
     async def get_verify_url(self) -> str:
         """获取验证 URL"""
-        from Modules.common.libs.config.registry import ConfigRegistry
-
-        config = ConfigRegistry.get("content")
+        config = Config.get("content")
         return config.zhihu_verify_url
 
     async def get_publish_url(self) -> str:
@@ -58,9 +58,7 @@ class ZhihuHandler(BasePlatformHandler):
         Returns:
             True 表示已登录，False 表示未登录
         """
-        from Modules.common.libs.config.registry import ConfigRegistry
-
-        config = ConfigRegistry.get("content")
+        config = Config.get("content")
 
         try:
             # 确保页面已初始化
@@ -236,6 +234,33 @@ class ZhihuHandler(BasePlatformHandler):
         assert self.page is not None
         assert self.article_data is not None, "article_data 不能为 None"
 
+        # 【新增】先等待页面稳定，让 React 组件有时间渲染
+        logger.info("[知乎] 等待页面稳定（React 渲染）...")
+        await asyncio.sleep(3)
+
+        # 【新增】调试：打印当前页面 URL 和标题
+        current_url = self.page.url
+        page_title = await self.page.title()
+        logger.debug(f"[知乎] 当前页面 URL: {current_url}")
+        logger.debug(f"[知乎] 当前页面标题: {page_title}")
+
+        # 【新增】调试：检查页面中是否存在 contenteditable 元素
+        try:
+            has_contenteditable = await self.page.evaluate(
+                "() => !!document.querySelector('[contenteditable]')"
+            )
+            logger.debug(f"[知乎] 页面中是否存在 contenteditable 元素: {has_contenteditable}")
+        except Exception as e:
+            logger.debug(f"[知乎] 检查 contenteditable 时出错: {e}")
+
+        # 【新增】调试：打印页面 body 的部分 HTML（前 500 字符）
+        try:
+            body_html = await self.page.evaluate("() => document.body.innerHTML")
+            html_preview = body_html[:500] if body_html else ""
+            logger.debug(f"[知乎] 页面 HTML 预览（前 500 字符）:\n{html_preview}")
+        except Exception as e:
+            logger.debug(f"[知乎] 获取页面 HTML 时出错: {e}")
+
         # 1. 等待编辑器加载
         logger.info("[知乎] 等待编辑器加载...")
         editor_selectors = [
@@ -247,8 +272,9 @@ class ZhihuHandler(BasePlatformHandler):
         editor = None
         for selector in editor_selectors:
             try:
+                # 增加超时时间到 10 秒
                 editor = await self.page.wait_for_selector(
-                    selector, timeout=5000, state="visible"
+                    selector, timeout=10000, state="visible"
                 )
                 if editor:
                     logger.info(f"[知乎] ✓ 编辑器已加载: {selector}")
@@ -259,6 +285,23 @@ class ZhihuHandler(BasePlatformHandler):
 
         if not editor:
             logger.error("[知乎] 编辑器加载超时，所有选择器均未找到")
+            # 【新增】打印页面上所有可能的编辑器元素
+            try:
+                all_editors = await self.page.evaluate(
+                    """() => {
+                    const elements = document.querySelectorAll('[contenteditable], .editor, .Editor, [class*="editor"], [class*="Editor"]');
+                    return Array.from(elements).map(el => ({
+                    tagName: el.tagName,
+                    className: el.className,
+                    id: el.id,
+                    contentEditable: el.contentEditable,
+                    placeholder: el.placeholder || '',
+                    })).slice(0, 10);
+                    }"""
+                )
+                logger.debug(f"[知乎] 页面上找到的可能编辑器元素: {all_editers}")
+            except Exception as e:
+                logger.debug(f"[知乎] 获取编辑器元素时出错: {e}")
             raise Exception("编辑器加载超时，请检查网络或页面状态")
 
         # 2. 填写标题
@@ -298,7 +341,7 @@ class ZhihuHandler(BasePlatformHandler):
                 logger.warning("[知乎] ⚠ 未找到标题输入框，跳过标题填写")
 
         # 3. 填写正文内容
-        logger.info("[知乎] 填写正文内容...")
+        logger.info("[知乎] ========== 开始填写正文内容 ==========")
         content = self.article_data.get("content", "")
         if content:
             # 检查内容是否为 HTML 格式（包含 HTML 标签）
@@ -306,29 +349,84 @@ class ZhihuHandler(BasePlatformHandler):
                 logger.info("[知乎] 检测到 HTML 格式内容，正在转换为 Markdown...")
                 # 使用 markdownify 将 HTML 转换为 Markdown
                 markdown_content = md(content)
-                logger.debug(
+                logger.info(
                     f"[知乎] HTML 转换前长度: {len(content)}, Markdown 转换后长度: {len(markdown_content)}"
                 )
-                logger.debug(f"[知乎] HTML 原文: {content[:100]}...")
-                logger.debug(f"[知乎] Markdown 结果: {markdown_content[:100]}...")
+                logger.debug(f"[知乎] HTML 原文前100字符: {content[:100]}...")
+                logger.debug(f"[知乎] Markdown 结果前100字符: {markdown_content[:100]}...")
                 content = markdown_content
             else:
-                logger.debug("[知乎] 内容非 HTML 格式，直接使用原文")
+                logger.info("[知乎] 内容非 HTML 格式，直接使用原文")
+
+            # 计算预计耗时
+            content_length = len(content)
+            estimated_time_seconds = content_length * 0.05  # 每字符 50ms
+            logger.info(f"[知乎] 内容长度: {content_length} 字符")
+            logger.info(f"[知乎] 预计输入耗时: {estimated_time_seconds:.1f} 秒 ({estimated_time_seconds/60:.1f} 分钟)")
+            logger.info(f"[知乎] 输入速度: 50ms/字符")
+
+            # 检查是否会超时
+            config = Config.get("content")
+            timeout_seconds = config.playwright_timeout / 1000 if config else 30
+            if estimated_time_seconds > timeout_seconds:
+                logger.warning(f"[知乎] ⚠️ 预计耗时 ({estimated_time_seconds:.1f}s) 超过超时配置 ({timeout_seconds}s)")
+                logger.warning(f"[知乎] ⚠️ 可能会触发超时异常！")
 
             # 等待并点击正文编辑区域
+            logger.info("[知乎] 点击正文编辑区域...")
             await editor.click()
             await asyncio.sleep(1)
+            logger.info("[知乎] ✓ 已点击编辑区域")
 
             # 清空现有内容
+            logger.info("[知乎] 清空现有内容...")
             await self.page.keyboard.press("Control+A")
             await asyncio.sleep(0.3)
             await self.page.keyboard.press("Delete")
             await asyncio.sleep(0.5)
+            logger.info("[知乎] ✓ 内容已清空")
 
-            # 输入正文（使用 type 方法模拟打字，更自然）
-            logger.info(f"[知乎] 正在输入正文（长度: {len(content)} 字符）...")
-            await editor.type(content, delay=50)  # 每个字符延迟 50ms
-            logger.info("[知乎] ✓ 正文已填写")
+            # 输入正文（分块输入 + 随机延迟，模拟人类打字）
+            logger.info("[知乎] ========== 开始输入正文（分块模式） ==========")
+            logger.info(f"[知乎] 开始时间: {asyncio.get_event_loop().time()}")
+
+            # 分块输入配置
+            chunk_size = 50  # 每块字符数
+            intra_chunk_delay = 5  # 块内每个字符延迟（ms）
+            inter_chunk_delay_min = 0.5  # 块间最小延迟（秒）
+            inter_chunk_delay_max = 1.5  # 块间最大延迟（秒）
+
+            total_chunks = (content_length + chunk_size - 1) // chunk_size
+            logger.info(f"[知乎] 分块配置: 每块 {chunk_size} 字符，共 {total_chunks} 块")
+            logger.info(f"[知乎] 块内延迟: {intra_chunk_delay}ms/字符，块间延迟: {inter_chunk_delay_min}-{inter_chunk_delay_max}秒")
+
+            try:
+                for i in range(0, content_length, chunk_size):
+                    chunk = content[i:i + chunk_size]
+                    chunk_num = i // chunk_size + 1
+
+                    logger.info(f"[知乎] 输入第 {chunk_num}/{total_chunks} 块 ({len(chunk)} 字符)...")
+
+                    # 输入当前块
+                    await editor.type(chunk, delay=intra_chunk_delay)
+
+                    # 计算进度
+                    progress = min(100, int((i + len(chunk)) / content_length * 100))
+                    logger.info(f"[知乎] ✓ 第 {chunk_num} 块完成，进度: {progress}%")
+
+                    # 如果不是最后一块，添加随机停顿（模拟思考/停顿）
+                    if i + len(chunk) < content_length:
+                        pause_time = random.uniform(inter_chunk_delay_min, inter_chunk_delay_max)
+                        logger.debug(f"[知乎] 停顿 {pause_time:.2f} 秒...")
+                        await asyncio.sleep(pause_time)
+
+                logger.info(f"[知乎] 结束时间: {asyncio.get_event_loop().time()}")
+                logger.info("[知乎] ✓ 正文输入完成（分块模式）")
+
+            except Exception as e:
+                logger.error(f"[知乎] ✗ 正文输入失败: {type(e).__name__}: {str(e)}")
+                logger.error(f"[知乎] 已输入部分内容，但操作未完成")
+                raise
 
         # 4. 滚动到编辑器底部，确保所有内容加载
         await asyncio.sleep(2)
@@ -394,8 +492,10 @@ class ZhihuHandler(BasePlatformHandler):
 
             success_indicators = [
                 lambda: "zhuanlan.zhihu.com/p/" in current_url,  # 专栏文章
-                lambda: "zhihu.com/question/" in current_url
-                or "zhihu.com/p/" in current_url,
+                lambda: (
+                    "zhihu.com/question/" in current_url
+                    or "zhihu.com/p/" in current_url
+                ),
                 lambda: current_url != publish_url,
             ]
 
@@ -520,9 +620,7 @@ class ZhihuHandler(BasePlatformHandler):
         """
         from playwright.async_api import async_playwright
 
-        from Modules.common.libs.config.registry import ConfigRegistry
-
-        config = ConfigRegistry.get("content")
+        config = Config.get("content")
         questions = []
 
         try:
@@ -556,29 +654,28 @@ class ZhihuHandler(BasePlatformHandler):
             # 设置默认超时时间
             self.page.set_default_timeout(config.playwright_timeout)
 
-            # 反检测：页面创建后随机延迟
-            if config.human_behavior_enabled:
-                delay = random.uniform(config.random_delay_min, config.random_delay_max)
-                await asyncio.sleep(delay)
-                logger.debug(f"[知乎] ✓ 延迟 {delay:.2f} 秒")
-
-            # 先访问平台域名（避免跨域问题）
-            logger.debug(f"[知乎] 访问平台域名: https://{self.platform_domain}")
-            await self.page.goto(f"https://{self.platform_domain}")
-
-            # 反检测：访问域名后随机延迟
-            if config.human_behavior_enabled:
-                delay = random.uniform(config.random_delay_min, config.random_delay_max)
-                await asyncio.sleep(delay)
-                logger.debug(f"[知乎] ✓ 延迟 {delay:.2f} 秒")
-
-            # 添加 Cookies
+            # 【修复】先添加 Cookies，再访问页面
+            # 这样可以确保Cookie在访问页面时就生效，避免被服务器返回的Set-Cookie覆盖
             converted_cookies = self._convert_cookies()
             logger.debug(f"[知乎] 添加 {len(converted_cookies)} 个 Cookie...")
             await context.add_cookies(converted_cookies)  # type: ignore
             logger.debug("[知乎] ✓ Cookie 添加完成")
 
             # 反检测：添加 Cookies 后随机延迟
+            if config.human_behavior_enabled:
+                delay = random.uniform(config.random_delay_min, config.random_delay_max)
+                await asyncio.sleep(delay)
+                logger.debug(f"[知乎] ✓ 延迟 {delay:.2f} 秒")
+
+            # 【新增】先访问主站预热（模拟真实用户行为）
+            # 真实用户会先在主站浏览，然后再进入创作者中心
+            logger.info("[知乎] ========== 主站预热阶段 ==========")
+            logger.debug(f"[知乎] 访问知乎主站: https://{self.platform_domain}")
+            await self.page.goto(f"https://{self.platform_domain}")
+            await self.page.wait_for_load_state("networkidle", timeout=15000)
+            logger.debug("[知乎] ✓ 主站加载完成")
+
+            # 反检测：主站加载后随机延迟
             if config.human_behavior_enabled:
                 delay = random.uniform(config.random_delay_min, config.random_delay_max)
                 await asyncio.sleep(delay)
@@ -620,7 +717,7 @@ class ZhihuHandler(BasePlatformHandler):
     ) -> list[dict]:
         """通过 API 获取推荐问题（主动调用方式）
 
-        使用 page.evaluate() 在页面上下文中主动调用 fetch() 获取 API 数据。
+        使用 page.goto() 直接访问 API URL，浏览器会自动带上完整的请求头和 cookies。
         API 端点: https://www.zhihu.com/api/v4/creators/question_route/author_related/recommend
 
         Args:
@@ -646,14 +743,19 @@ class ZhihuHandler(BasePlatformHandler):
         try:
             logger.info("[知乎] 正在通过 API 主动调用获取推荐问题...")
 
-            # 确保在推荐问题页面（用于设置正确的 referer）
+            # 步骤1: 确保在推荐问题页面（用于设置正确的 referer 和生成完整 cookies）
             recommend_url = "https://www.zhihu.com/creator/featured-question/recommend"
             if "recommend" not in self.page.url:
                 logger.info(f"[知乎] 导航到推荐问题页面: {recommend_url}")
                 await self.page.goto(recommend_url, timeout=10000)
                 await self.page.wait_for_load_state("networkidle", timeout=10000)
 
-            # 构造 API URL
+            # 步骤2: 额外等待几秒，让页面完全加载并生成所有必要的 cookies
+            # 特别是 _xsrf、__zse_ck 等加密相关的 cookie 需要时间生成
+            logger.info("[知乎] 等待页面完全加载并生成必要的 cookies...")
+            await self.page.wait_for_timeout(3000)  # 等待 3 秒
+
+            # 步骤3: 构造 API URL
             # API 参数说明:
             # - limit: 返回数量
             # - offset: 偏移量（用于分页）
@@ -665,53 +767,16 @@ class ZhihuHandler(BasePlatformHandler):
             )
             logger.debug(f"[知乎] API URL: {api_url}")
 
-            # 在页面上下文中执行 fetch 请求
-            # 使用 credentials: 'include' 自动携带 Cookie
-            logger.debug("[知乎] 执行 fetch 请求...")
-            response_data = await self.page.evaluate(
-                """
-                async (url) => {
-                    try {
-                        const response = await fetch(url, {
-                            method: 'GET',
-                            credentials: 'include',  // 自动携带 Cookie
-                            headers: {
-                                'Accept': 'application/json',
-                                'Content-Type': 'application/json',
-                            }
-                        });
-                        if (!response.ok) {
-                            return {
-                                error: true,
-                                status: response.status,
-                                statusText: response.statusText
-                            };
-                        }
-                        const data = await response.json();
-                        return {
-                            error: false,
-                            data: data
-                        };
-                    } catch (error) {
-                        return {
-                            error: true,
-                            message: error.toString()
-                        };
-                    }
-                }
-            """,
-                api_url,
-            )
+            # 步骤4: 直接访问 API URL，浏览器会自动带上完整的请求头和 cookies
+            logger.debug("[知乎] 直接访问 API URL...")
+            await self.page.goto(api_url, timeout=10000)
+            await self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+            await self.page.wait_for_timeout(5000)  # 额外等待 5 秒
 
-            if response_data.get("error"):
-                error_msg = (
-                    response_data.get("message")
-                    or f"HTTP {response_data.get('status')}"
-                )
-                logger.error(f"[知乎] API 请求失败: {error_msg}")
-                return questions
-
-            data = response_data.get("data", {})
+            # 步骤5: 从页面内容中解析 JSON 数据
+            # API 返回的是纯 JSON 文本，在 body 中
+            page_text = await self.page.evaluate("() => document.body.innerText")
+            data = json.loads(page_text)
             logger.debug("[知乎] ✓ API 请求成功")
 
             # 解析 API 响应数据结构
@@ -766,7 +831,11 @@ class ZhihuHandler(BasePlatformHandler):
                     author_name = None
                     if "author" in q:
                         author = q["author"]
-                        author_name = author.get("name", "") if isinstance(author, dict) else str(author)
+                        author_name = (
+                            author.get("name", "")
+                            if isinstance(author, dict)
+                            else str(author)
+                        )
 
                     # 提取分类/话题（如果有的话）
                     category_name = None

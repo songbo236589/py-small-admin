@@ -24,7 +24,7 @@ class PublishArticleRequest(BaseModel):
         if not v or len(v.strip()) == 0:
             raise ValueError("平台标识不能为空")
         v = v.strip().lower()
-        supported_platforms = ["zhihu"]
+        supported_platforms = ["zhihu", "xiaohongshu", "toutiao"]
         if v not in supported_platforms:
             raise ValueError(f"不支持的平台，支持的平台有: {', '.join(supported_platforms)}")
         return v
@@ -88,7 +88,7 @@ class PublishBatchRequest(BaseModel):
         if not v or len(v.strip()) == 0:
             raise ValueError("平台标识不能为空")
         v = v.strip().lower()
-        supported_platforms = ["zhihu"]
+        supported_platforms = ["zhihu", "xiaohongshu", "toutiao"]
         if v not in supported_platforms:
             raise ValueError(f"不支持的平台，支持的平台有: {', '.join(supported_platforms)}")
         return v

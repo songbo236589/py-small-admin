@@ -120,6 +120,52 @@
 | `LOG_MAX_SIZE` | 单文件最大大小 | 10485760 | 10485760 (10MB) |
 | `LOG_BACKUP_COUNT` | 备份文件数量 | 10 | 10 |
 
+### 内容模块配置
+
+#### Playwright 浏览器配置
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `CONTENT_PLAYWRIGHT_HEADLESS` | 是否无头模式 | true | true/false |
+| `CONTENT_PLAYWRIGHT_TIMEOUT` | 浏览器操作超时时间（毫秒） | 30000 | 30000 |
+| `CONTENT_PLAYWRIGHT_WIDTH` | 浏览器窗口宽度（像素） | 1920 | 1920 |
+| `CONTENT_PLAYWRIGHT_HEIGHT` | 浏览器窗口高度（像素） | 1080 | 1080 |
+
+#### 平台验证配置
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `CONTENT_ZHIHU_VERIFY_URL` | 知乎验证 URL | https://www.zhihu.com | - |
+| `CONTENT_ZHIHU_LOGIN_SELECTOR` | 知乎登录按钮选择器 | .AppHeader-login | - |
+| `CONTENT_ZHIHU_LOGGED_IN_SELECTOR` | 知乎登录后元素选择器 | .AppHeader-notifications | - |
+
+#### 反检测配置
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `CONTENT_HUMAN_BEHAVIOR_ENABLED` | 是否启用人类行为模拟 | true | true/false |
+| `CONTENT_RANDOM_DELAY_MIN` | 操作间最小随机延迟时间（秒） | 1.0 | 1.0 |
+| `CONTENT_RANDOM_DELAY_MAX` | 操作间最大随机延迟时间（秒） | 3.0 | 3.0 |
+| `CONTENT_VERIFY_INTERVAL_MIN` | 最小验证间隔（秒） | 300 | 300 |
+| `CONTENT_STAY_TIME_SUCCESS_MIN` | 验证成功后最小停留时间（秒） | 5.0 | 5.0 |
+| `CONTENT_STAY_TIME_SUCCESS_MAX` | 验证成功后最大停留时间（秒） | 8.0 | 8.0 |
+| `CONTENT_STAY_TIME_FAILED_MIN` | 验证失败后最小停留时间（秒） | 2.0 | 2.0 |
+| `CONTENT_STAY_TIME_FAILED_MAX` | 验证失败后最大停留时间（秒） | 4.0 | 4.0 |
+| `CONTENT_SCROLL_COUNT_MIN` | 最小滚动次数 | 1 | 1 |
+| `CONTENT_SCROLL_COUNT_MAX` | 最大滚动次数 | 3 | 3 |
+| `CONTENT_MOUSE_MOVE_COUNT_MIN` | 最小鼠标移动次数 | 2 | 2 |
+| `CONTENT_MOUSE_MOVE_COUNT_MAX` | 最大鼠标移动次数 | 4 | 4 |
+
+#### 页面刷新配置
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `CONTENT_ENABLE_PAGE_REFRESH` | 是否在验证时刷新页面 | true | true/false |
+| `CONTENT_PAGE_REFRESH_DELAY_MIN` | 刷新前最小延迟时间（秒） | 2.0 | 2.0 |
+| `CONTENT_PAGE_REFRESH_DELAY_MAX` | 刷新前最大延迟时间（秒） | 4.0 | 4.0 |
+| `CONTENT_PAGE_REFRESH_AFTER_DELAY_MIN` | 刷新后最小延迟时间（秒） | 1.0 | 1.0 |
+| `CONTENT_PAGE_REFRESH_AFTER_DELAY_MAX` | 刷新后最大延迟时间（秒） | 2.0 | 2.0 |
+
 ### CORS 配置
 
 | 变量名 | 说明 | 默认值 | 示例 |
@@ -133,12 +179,42 @@
 
 | 变量名 | 说明 | 默认值 | 示例 |
 |--------|------|--------|------|
+| `CONTENT_OLLAMA_ENABLED` | 是否启用 Ollama AI | true | true/false |
 | `CONTENT_OLLAMA_BASE_URL` | Ollama 服务地址 | http://localhost:11434 | http://localhost:11434 |
-| `CONTENT_OLLAMA_MODEL` | 默认使用的模型 | qwen2.5:7b | llama3.2:8b |
 | `CONTENT_OLLAMA_TIMEOUT` | AI 生成超时时间（秒） | 120 | 120 |
-| `CONTENT_OLLAMA_ENABLED` | 是否启用 AI 功能 | true | true/false |
 
 **Ollama 安装说明**：详见 [安装指南 - Ollama 安装](../../getting-started/install.md#42-安装-ollama可选)
+
+### 智谱AI 配置
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `CONTENT_ZHIPU_ENABLED` | 是否启用智谱AI | true | true/false |
+| `CONTENT_ZHIPU_API_KEY` | 智谱AI API Key | - | 在[智谱AI开放平台](https://open.bigmodel.cn/)获取 |
+| `CONTENT_ZHIPU_BASE_URL` | 智谱AI API 地址 | https://open.bigmodel.cn/api/paas/v4 | - |
+| `CONTENT_ZHIPU_TIMEOUT` | AI 生成超时时间（秒） | 120 | 120 |
+| `CONTENT_ZHIPU_MODELS` | 智谱AI 模型列表（JSON 格式） | - | 见下方示例 |
+
+**智谱AI 模型列表格式**：
+
+```json
+[
+  {"name":"glm-4-flash-250414","label":"GLM-4-Flash","description":"最新免费模型，速度快"},
+  {"name":"glm-4.7-flash","label":"GLM-4.7-Flash","description":"新版Flash模型"},
+  {"name":"glm-4-air","label":"GLM-4-Air","description":"轻量级模型"},
+  {"name":"glm-4-plus","label":"GLM-4-Plus","description":"强力模型，适合深度生成"}
+]
+```
+
+**环境变量配置示例**：
+
+```bash
+CONTENT_ZHIPU_ENABLED=true
+CONTENT_ZHIPU_API_KEY=your-api-key-here
+CONTENT_ZHIPU_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+CONTENT_ZHIPU_TIMEOUT=120
+CONTENT_ZHIPU_MODELS=[{"name":"glm-4-flash-250414","label":"GLM-4-Flash","description":"最新免费模型，速度快"}]
+```
 
 ## 配置示例
 

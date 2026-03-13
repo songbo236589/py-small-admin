@@ -35,6 +35,7 @@ class ArticleController:
         summary: str | None = Query(None, description="文章摘要"),
         status: int | None = Query(None, description="状态"),
         category_id: int | None = Query(None, description="分类ID"),
+        topic_id: int | None = Query(None, description="话题ID"),
         tag_id: int | None = Query(None, description="标签ID"),
         sort: str | None = Query(None, description="排序规则"),
         created_at_start: str | None = Query(
@@ -59,6 +60,7 @@ class ArticleController:
                 "summary": summary,
                 "status": status,
                 "category_id": category_id,
+                "topic_id": topic_id,
                 "tag_id": tag_id,
                 "sort": sort,
                 "created_at_start": created_at_start,
@@ -76,6 +78,7 @@ class ArticleController:
         summary: str | None = Form(None, description="文章摘要"),
         cover_image_id: int | None = Form(None, description="封面图片ID"),
         category_id: int | None = Form(None, description="分类ID"),
+        topic_id: int | None = Form(None, description="话题ID"),
         tag_ids: str | None = Form(None, description="标签ID列表"),
         status: int = Form(0, description="状态"),
     ) -> JSONResponse:
@@ -87,6 +90,7 @@ class ArticleController:
                 "summary": summary,
                 "cover_image_id": cover_image_id,
                 "category_id": category_id,
+                "topic_id": topic_id,
                 "tag_ids": tag_ids,
                 "status": status,
             }
@@ -107,6 +111,7 @@ class ArticleController:
         summary: str | None = Form(None, description="文章摘要"),
         cover_image_id: int | None = Form(None, description="封面图片ID"),
         category_id: int | None = Form(None, description="分类ID"),
+        topic_id: int | None = Form(None, description="话题ID"),
         tag_ids: str | None = Form(None, description="标签ID列表"),
         status: int = Form(..., description="状态"),
     ) -> JSONResponse:
@@ -119,6 +124,7 @@ class ArticleController:
                 "summary": summary,
                 "cover_image_id": cover_image_id,
                 "category_id": category_id,
+                "topic_id": topic_id,
                 "tag_ids": tag_ids,
                 "status": status,
             },

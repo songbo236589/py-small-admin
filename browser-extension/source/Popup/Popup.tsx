@@ -187,9 +187,67 @@ const Popup: React.FC = () => {
       const cookieStores = await new Promise<chrome.cookies.CookieStore[]>((resolve) => {
         chrome.cookies.getAllCookieStores((stores) => resolve(stores));
       });
+      console.log('🔍 [Cookie 调试] Cookie Stores:', cookieStores);
+      console.log('🔍 [Cookie 调试] 平台配置:', state.platforms);
 
       // 按平台分组 Cookies
       const platformCookiesMap = new Map<string, chrome.cookies.Cookie[]>();
+
+      // 改进的域名匹配函数 - 确保捕获所有相关域名的 Cookie
+      const matchesDomain = (cookieDomain: string, platformDomain: string): boolean => {
+        // 标准化域名（移除前导点）
+        const normalizedCookie = cookieDomain.replace(/^\./, '').toLowerCase();
+        const normalizedPlatform = platformDomain.toLowerCase();
+
+        // 1. 完全匹配
+        if (normalizedCookie === normalizedPlatform) {
+          return true;
+        }
+
+        // 2. Cookie 域是平台域的子域名 (e.g., edith.xiaohongshu.com matches xiaohongshu.com)
+        if (normalizedCookie.endsWith('.' + normalizedPlatform)) {
+          return true;
+        }
+
+        // 3. 平台域是 Cookie 域的子域名 (e.g., xiaohongshu.com matches .xiaohongshu.com)
+        if (normalizedPlatform.endsWith('.' + normalizedCookie)) {
+          return true;
+        }
+
+        // 4. Cookie 域包含平台域作为部分 (e.g., www.xiaohongshu.com matches xiaohongshu.com)
+        if (normalizedCookie.includes(normalizedPlatform) && normalizedPlatform.length > 0) {
+          // 确保是完整的域名部分匹配，不是部分字符串匹配
+          const cookieParts = normalizedCookie.split('.');
+          const platformParts = normalizedPlatform.split('.');
+          // 如果平台域的所有部分都出现在 Cookie 域中（按顺序），则匹配
+          let platformIndex = 0;
+          for (const cookiePart of cookieParts) {
+            if (cookiePart === platformParts[platformIndex]) {
+              platformIndex++;
+              if (platformIndex >= platformParts.length) {
+                return true;
+              }
+            }
+          }
+        }
+
+        // 5. 平台域包含 Cookie 域作为部分
+        if (normalizedPlatform.includes(normalizedCookie) && normalizedCookie.length > 0) {
+          const platformParts = normalizedPlatform.split('.');
+          const cookieParts = normalizedCookie.split('.');
+          let cookieIndex = 0;
+          for (const platformPart of platformParts) {
+            if (platformPart === cookieParts[cookieIndex]) {
+              cookieIndex++;
+              if (cookieIndex >= cookieParts.length) {
+                return true;
+              }
+            }
+          }
+        }
+
+        return false;
+      };
 
       // 2. 遍历所有 Cookie Store
       for (const store of cookieStores) {
@@ -197,6 +255,15 @@ const Popup: React.FC = () => {
         const storeCookies = await new Promise<chrome.cookies.Cookie[]>((resolve) => {
           chrome.cookies.getAll({ storeId: store.id }, (cookies) => resolve(cookies || []));
         });
+        console.log(`🔍 [Cookie 调试] Store ${store.id}: 获取到 ${storeCookies.length} 个 Cookie`);
+
+        // 打印所有 Cookie 名称和域名（用于调试）
+        const cookieSummary = storeCookies.map(c => ({
+          name: c.name,
+          domain: c.domain,
+          value: c.value.substring(0, 20) + '...'
+        }));
+        console.log(`🔍 [Cookie 调试] Store ${store.id} Cookie 列表:`, cookieSummary);
 
         // 4. 根据平台域名过滤并分组 Cookies
         for (const cookie of storeCookies) {
@@ -205,18 +272,121 @@ const Popup: React.FC = () => {
 
           // 检查是否匹配任何平台
           for (const platform of state.platforms) {
+            let matched = false;
             for (const domain of platform.domains) {
-              if (cookieDomain.includes(domain) || domain.includes(cookieDomain)) {
+              const isMatch = matchesDomain(cookieDomain, domain);
+              if (isMatch) {
+                console.log(`✅ [域名匹配] Cookie "${cookie.name}" (${cookieDomain}) 匹配平台 "${platform.name}" (${domain})`);
                 // 找到匹配的平台，将 cookie 添加到对应平台
                 if (!platformCookiesMap.has(platform.id)) {
                   platformCookiesMap.set(platform.id, []);
                 }
                 platformCookiesMap.get(platform.id)!.push(cookie);
+                matched = true;
                 break;
               }
             }
+            if (matched) break;
           }
         }
+      }
+
+      // 🔥 特殊处理：针对小红书平台，使用 chrome.cookies.get() 单独获取关键 Cookie
+      // 因为 chrome.cookies.getAll() 可能无法获取到某些 Cookie（如 a1）
+      const xiaohongshuPlatform = state.platforms.find(p => p.id === 'xiaohongshu');
+      if (xiaohongshuPlatform) {
+        console.log('🔍 [小红书特殊处理] 尝试单独获取关键 Cookie...');
+
+        // 需要单独获取的关键 Cookie 名称
+        const criticalCookieNames = ['a1', 'webId', 'gid', 'webId'];
+
+        for (const cookieName of criticalCookieNames) {
+          try {
+            const cookie = await new Promise<chrome.cookies.Cookie | null>((resolve) => {
+              chrome.cookies.get(
+                { url: 'https://www.xiaohongshu.com', name: cookieName },
+                (c) => resolve(c || null)
+              );
+            });
+
+            if (cookie) {
+              console.log(`✅ [小红书特殊处理] 成功获取 Cookie: ${cookieName}`);
+
+              // 将 Cookie 添加到 platformCookiesMap
+              if (!platformCookiesMap.has('xiaohongshu')) {
+                platformCookiesMap.set('xiaohongshu', []);
+              }
+
+              // 检查是否已经存在（避免重复）
+              const existingCookies = platformCookiesMap.get('xiaohongshu')!;
+              const exists = existingCookies.some(c => c.name === cookie.name);
+
+              if (!exists) {
+                platformCookiesMap.get('xiaohongshu')!.push(cookie);
+                console.log(`  ➕ 已添加到 Cookie 列表`);
+              } else {
+                console.log(`  ℹ️ Cookie 已存在，跳过`);
+              }
+            } else {
+              console.log(`⚠️ [小红书特殊处理] Cookie 不存在: ${cookieName}`);
+            }
+          } catch (error) {
+            console.error(`❌ [小红书特殊处理] 获取 Cookie 失败 (${cookieName}):`, error);
+          }
+        }
+      }
+
+      // 🔥 特殊处理：针对今日头条平台，使用 chrome.cookies.get() 单独获取关键 Cookie
+      // 因为某些关键 Cookie 可能被标记为 httpOnly 或有特殊限制
+      const toutiaoPlatform = state.platforms.find(p => p.id === 'toutiao');
+      if (toutiaoPlatform) {
+        console.log('🔍 [今日头条特殊处理] 尝试单独获取关键 Cookie...');
+
+        // 需要单独获取的关键 Cookie 名称
+        const criticalCookieNames = ['sessionid', 'sid_tt', 'odin_tt', 'csrftoken', 'passport_csrf_token'];
+
+        for (const cookieName of criticalCookieNames) {
+          try {
+            const cookie = await new Promise<chrome.cookies.Cookie | null>((resolve) => {
+              chrome.cookies.get(
+                { url: 'https://www.toutiao.com', name: cookieName },
+                (c) => resolve(c || null)
+              );
+            });
+
+            if (cookie) {
+              console.log(`✅ [今日头条特殊处理] 成功获取 Cookie: ${cookieName}`);
+
+              // 将 Cookie 添加到 platformCookiesMap
+              if (!platformCookiesMap.has('toutiao')) {
+                platformCookiesMap.set('toutiao', []);
+              }
+
+              // 检查是否已经存在（避免重复）
+              const existingCookies = platformCookiesMap.get('toutiao')!;
+              const exists = existingCookies.some(c => c.name === cookie.name);
+
+              if (!exists) {
+                platformCookiesMap.get('toutiao')!.push(cookie);
+                console.log(`  ➕ 已添加到 Cookie 列表`);
+              } else {
+                console.log(`  ℹ️ Cookie 已存在，跳过`);
+              }
+            } else {
+              console.log(`⚠️ [今日头条特殊处理] Cookie 不存在: ${cookieName}`);
+            }
+          } catch (error) {
+            console.error(`❌ [今日头条特殊处理] 获取 Cookie 失败 (${cookieName}):`, error);
+          }
+        }
+      }
+
+      // 打印最终分组的 Cookie 结果
+      console.log('📊 [Cookie 调试] 最终分组结果:');
+      for (const [platformId, cookies] of platformCookiesMap.entries()) {
+        const platform = state.platforms.find(p => p.id === platformId);
+        console.log(`  📦 ${platform?.name || platformId}: ${cookies.length} 个 Cookie`);
+        console.log(`     Cookie 名称列表:`, cookies.map(c => c.name));
       }
 
       // 5. 构建 fetchedPlatforms 数组
@@ -316,7 +486,7 @@ const Popup: React.FC = () => {
                   <span className="platform-status empty">未登录</span>
                 )}
               </div>
-              {hasCookies && fp.platform.id === 'zhihu' && !fp.sent && (
+              {hasCookies && !fp.sent && (
                 <Button
                   type="primary"
                   size="small"

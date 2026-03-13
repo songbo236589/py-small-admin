@@ -15,6 +15,7 @@ from Modules.common.models.base_model import BaseTableModel
 
 if TYPE_CHECKING:
     from .content_article import ContentArticle
+    from .content_topic import ContentTopic
 
 
 class ContentCategory(BaseTableModel, table=True):
@@ -104,6 +105,9 @@ class ContentCategory(BaseTableModel, table=True):
 
     # 一对多：一个分类 → 多个文章
     articles: list["ContentArticle"] = Relationship(back_populates="category")
+
+    # 一对多：一个分类 → 多个话题
+    topics: list["ContentTopic"] = Relationship(back_populates="category")
 
     class Config:
         """Pydantic配置"""

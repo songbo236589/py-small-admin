@@ -54,3 +54,45 @@ router.delete(
     response_model=dict[str, Any],
     summary="批量删除",
 )(controller.destroy_all)
+
+
+router.put(
+    "/batch_update_category",
+    response_model=dict[str, Any],
+    summary="批量更新分类",
+)(controller.batch_update_category)
+
+
+router.post(
+    "/generate_description/{id}",
+    response_model=dict[str, Any],
+    summary="AI 生成话题描述",
+)(controller.generate_description)
+
+
+router.put(
+    "/update_description/{id}",
+    response_model=dict[str, Any],
+    summary="更新话题描述",
+)(controller.update_description)
+
+
+router.put(
+    "/update_category/{id}",
+    response_model=dict[str, Any],
+    summary="更新话题分类",
+)(controller.update_category)
+
+
+router.post(
+    "/generate_category/{id}",
+    response_model=dict[str, Any],
+    summary="AI 生成话题分类",
+)(controller.generate_category)
+
+
+router.post(
+    "/fetch_zhihu_content/{id}",
+    response_model=dict[str, Any],
+    summary="手动抓取知乎问题内容",
+)(controller.fetch_zhihu_content)

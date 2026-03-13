@@ -55,6 +55,7 @@ npm start
 - 功能：查看、添加、编辑、删除管理员
 
 **添加管理员示例**：
+
 ```typescript
 // 1. 点击"添加"按钮
 // 2. 填写管理员信息（姓名、用户名、密码等）
@@ -68,6 +69,7 @@ npm start
 - 功能：配置角色、分配权限
 
 **配置权限示例**：
+
 ```typescript
 // 1. 点击"权限配置"按钮
 // 2. 勾选需要的菜单权限
@@ -85,6 +87,7 @@ npm start
 - 功能：配置系统参数、测试邮件
 
 **测试邮件示例**：
+
 ```typescript
 // 1. 进入"邮件配置"标签页
 // 2. 填写 SMTP 服务器信息
@@ -99,6 +102,7 @@ npm start
 - 功能：上传图片、文档、视频、音频
 
 **上传图片示例**：
+
 ```typescript
 // 1. 点击"图片上传"按钮
 // 2. 选择图片文件
@@ -119,6 +123,7 @@ npm start
 - 功能：查看股票列表、同步股票数据
 
 **同步股票数据**：
+
 ```python
 # 点击"同步股票列表"按钮
 # 等待同步完成
@@ -131,6 +136,7 @@ npm start
 - 功能：查看行业列表、同步行业数据
 
 **同步行业数据**：
+
 ```python
 # 点击"同步行业列表"按钮
 # 等待同步完成
@@ -143,6 +149,7 @@ npm start
 - 功能：查看概念列表、同步概念数据
 
 **同步概念数据**：
+
 ```python
 # 点击"同步概念列表"按钮
 # 等待同步完成
@@ -158,6 +165,111 @@ npm start
 
 - 路径：`/quant/data/concept_log`
 - 功能：查询概念历史数据
+
+### Content 模块
+
+#### 1. 查看内容仪表盘
+
+- 路径：`/content/dashboard`
+- 功能：查看内容概览、统计数据
+
+#### 2. 文章管理
+
+- 路径：`/content/manage/article`
+- 功能：创建、编辑、删除文章
+
+**创建文章示例**：
+
+```typescript
+// 1. 点击"新建文章"按钮
+// 2. 填写文章标题
+// 3. 选择分类和标签
+// 4. 编辑文章内容（TinyMCE）
+// 5. 点击"确定"提交
+```
+
+#### 3. 话题管理
+
+- 路径：`/content/manage/topic`
+- 功能：抓取知乎话题、使用话题创建文章
+
+**抓取话题示例**：
+
+```typescript
+// 1. 点击"抓取话题"按钮
+// 2. 选择知乎账号
+// 3. 设置抓取数量（10/20/50个）
+// 4. 点击"开始抓取"
+// 5. 等待抓取完成
+```
+
+**使用话题创建文章示例**：
+
+```typescript
+// 1. 在话题列表中选择感兴趣的话题
+// 2. 点击"使用"按钮
+// 3. 系统自动填充标题和描述
+// 4. 编辑文章内容
+// 5. 点击"确定"提交
+```
+
+#### 4. 平台账号管理
+
+- 路径：`/content/manage/platform-account`
+- 功能：管理各平台账号、验证 Cookie
+
+**添加账号示例**：
+
+```typescript
+// 1. 点击"添加账号"按钮
+// 2. 选择平台（知乎）
+// 3. 填写账号名称
+// 4. 使用浏览器扩展获取 Cookie
+// 5. 点击"验证"按钮验证 Cookie
+// 6. 点击"确定"提交
+```
+
+**验证账号示例**：
+
+```typescript
+// 1. 在账号列表中点击"验证"按钮
+// 2. 等待验证完成（约 10-30 秒）
+// 3. 查看验证结果
+```
+
+**Windows 用户注意**：
+在 Windows 系统上使用 Cookie 验证功能需要特殊配置：
+
+1. 将 `.env` 文件中的 `APP_RELOAD` 设置为 `false`
+2. 完全重启后端服务（使用 `python run.py`）
+3. 确保使用 `run.py` 启动，而不是直接用 `uvicorn` 命令
+
+详见：[浏览器自动化功能文档 - Windows 系统特殊配置](../backend/features/browser.md#windows-系统特殊配置)
+
+#### 5. 发布管理
+
+- 路径：`/content/manage/publish`
+- 功能：查看发布记录、重试失败发布
+
+**发布文章示例**：
+
+```typescript
+// 1. 在文章列表中找到要发布的文章
+// 2. 点击"发布"按钮
+// 3. 选择平台和账号
+// 4. 点击"确定"开始发布
+// 5. 等待发布完成
+```
+
+**查看发布记录示例**：
+
+```typescript
+// 1. 进入发布管理页面
+// 2. 查看所有发布记录
+// 3. 查看发布状态（待发布/发布中/成功/失败）
+// 4. 查看错误信息（如果发布失败）
+// 5. 点击"重试"按钮重试失败发布
+```
 
 ## API 文档查看
 
@@ -182,6 +294,23 @@ npm start
 - **POST** `/api/quant/stock/sync_stock_list` - 同步股票列表
 - **GET** `/api/quant/industry/index` - 获取行业列表
 - **POST** `/api/quant/industry/sync_industry_list` - 同步行业列表
+
+### Content 接口
+
+- **GET** `/api/content/article/index` - 获取文章列表
+- **POST** `/api/content/article/add` - 添加文章
+- **PUT** `/api/content/article/update/{id}` - 更新文章
+- **DELETE** `/api/content/article/destroy/{id}` - 删除文章
+- **GET** `/api/content/topic/index` - 获取话题列表
+- **GET** `/api/content/topic/fetch` - 抓取话题
+- **POST** `/api/content/topic/{id}/use` - 使用话题
+- **POST** `/api/content/topic/{id}/favorite` - 收藏话题
+- **GET** `/api/content/platform_account/index` - 获取账号列表
+- **POST** `/api/content/platform_account/add` - 添加账号
+- **POST** `/api/content/platform_account/verify/{id}` - 验证账号
+- **GET** `/api/content/publish/logs` - 获取发布记录
+- **POST** `/api/content/publish/article/{id}` - 发布文章
+- **PUT** `/api/content/publish/retry/{id}` - 重试发布
 
 ## 开发模式
 

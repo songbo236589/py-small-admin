@@ -73,24 +73,6 @@ class ContentConfig(BaseConfig):
     )
 
     # ============================================================
-    # Cookie 验证配置
-    # ============================================================
-
-    # Cookie 自动验证间隔（秒）
-    # 用于定时任务自动验证 Cookie 有效性
-    cookie_verify_interval: int = Field(
-        default=3600,
-        description="Cookie 自动验证间隔（秒），默认 1 小时",
-    )
-
-    # Cookie 过期预警时间（天）
-    # 在 Cookie 过期前多少天发送预警
-    cookie_expire_warning_days: int = Field(
-        default=7,
-        description="Cookie 过期预警时间（天）",
-    )
-
-    # ============================================================
     # 反检测配置（降低平台封号风险）
     # ============================================================
 
@@ -159,20 +141,46 @@ class ContentConfig(BaseConfig):
         description="最大鼠标移动次数",
     )
 
+    # 页面刷新配置（用于Cookie验证）
+    enable_page_refresh: bool = Field(
+        default=True,
+        description="是否在验证时刷新页面（刷新可以让Cookie完全生效）",
+    )
+
+    page_refresh_delay_min: float = Field(
+        default=2.0,
+        description="刷新前最小延迟时间（秒）",
+    )
+
+    page_refresh_delay_max: float = Field(
+        default=4.0,
+        description="刷新前最大延迟时间（秒）",
+    )
+
+    page_refresh_after_delay_min: float = Field(
+        default=1.0,
+        description="刷新后最小延迟时间（秒）",
+    )
+
+    page_refresh_after_delay_max: float = Field(
+        default=2.0,
+        description="刷新后最大延迟时间（秒）",
+    )
+
     # ============================================================
     # Ollama AI 配置
     # ============================================================
+
+    # 是否启用 Ollama AI 功能
+    ollama_enabled: bool = Field(
+        default=True,
+        description="是否启用 Ollama AI 功能",
+    )
 
     # Ollama 服务地址
     ollama_base_url: str = Field(
         default="http://localhost:11434",
         description="Ollama 服务地址",
-    )
-
-    # Ollama 模型名称
-    ollama_model: str = Field(
-        default="qwen2.5:7b",
-        description="Ollama 使用的模型名称",
     )
 
     # AI 生成超时时间（秒）
@@ -181,8 +189,126 @@ class ContentConfig(BaseConfig):
         description="AI 生成超时时间（秒），默认 2 分钟",
     )
 
-    # 是否启用 AI 功能
-    ollama_enabled: bool = Field(
+    # ============================================================
+    # 智谱AI 配置
+    # ============================================================
+
+    # 是否启用智谱AI功能
+    zhipu_enabled: bool = Field(
+        default=False,
+        description="是否启用智谱AI功能",
+    )
+
+    # 智谱AI API Key
+    zhipu_api_key: str = Field(
+        default="",
+        description="智谱AI API Key",
+    )
+
+    # 智谱AI API 地址
+    zhipu_base_url: str = Field(
+        default="https://open.bigmodel.cn/api/paas/v4",
+        description="智谱AI API 地址",
+    )
+
+    # 智谱AI 生成超时时间（秒）
+    zhipu_timeout: int = Field(
+        default=120,
+        description="智谱AI 生成超时时间（秒），默认 2 分钟",
+    )
+
+    # 智谱AI 模型列表（JSON 格式）
+    zhipu_models: str = Field(
+        default="",
+        description="智谱AI模型列表（JSON格式）",
+    )
+
+    # ============================================================
+    # 小红书配置
+    # ============================================================
+
+    # 小红书验证 URL（使用主站点进行登录验证，参考 go 实现）
+    xiaohongshu_verify_url: str = Field(
+        default="https://www.xiaohongshu.com/explore",
+        description="小红书验证 URL（主站）",
+    )
+
+    # 小红书创作者平台验证 URL
+    xiaohongshu_creator_verify_url: str = Field(
+        default="https://creator.xiaohongshu.com/new/home",
+        description="小红书创作者平台验证 URL",
+    )
+
+    # 是否启用创作者平台验证（二级验证）
+    xiaohongshu_enable_creator_verify: bool = Field(
         default=True,
-        description="是否启用 Ollama AI 功能",
+        description="是否在主站验证成功后，额外验证创作者平台访问权限",
+    )
+
+    # 小红书发布 URL
+    xiaohongshu_publish_url: str = Field(
+        default="https://creator.xiaohongshu.com/publish/publish?from=menu&target=article",
+        description="小红书发布 URL",
+    )
+
+    # 小红书登录检测选择器
+    # 存在此元素说明未登录，不存在说明已登录
+    xiaohongshu_login_selector: str = Field(
+        default=".login-container",
+        description="小红书登录容器选择器（存在则未登录）",
+    )
+
+    # 小红书登录后的元素选择器
+    # 存在此元素说明已登录
+    xiaohongshu_logged_in_selector: str = Field(
+        default=".main-container .user .link-wrapper .channel",
+        description="小红书登录后的元素选择器（存在则已登录）",
+    )
+
+    # 小红书最大标题长度（字）
+    xiaohongshu_max_title_length: int = Field(
+        default=20,
+        description="小红书最大标题长度（字），中文算2字节",
+    )
+
+    # 小红书建议正文长度（字）
+    xiaohongshu_max_content_length: int = Field(
+        default=1000,
+        description="小红书建议正文长度（字）",
+    )
+
+    # 小红书最大标签数量
+    xiaohongshu_max_tags: int = Field(
+        default=10,
+        description="小红书最大标签数量",
+    )
+
+    # ============================================================
+    # 今日头条配置
+    # ============================================================
+
+    # 今日头条验证 URL
+    toutiao_verify_url: str = Field(
+        default="https://www.toutiao.com",
+        description="今日头条验证 URL（主站）",
+    )
+
+    # 今日头条发布 URL
+    toutiao_publish_url: str = Field(
+        default="https://mp.toutiao.com/profile_v4/graphic/publish?from=toutiao_pc",
+        description="今日头条发布 URL",
+    )
+
+    # 今日头条登录检测选择器
+    # 存在此元素说明未登录
+    toutiao_login_selector: str = Field(
+        default=".user-card.login",
+        description="今日头条登录容器选择器（存在则未登录）",
+    )
+
+    # 今日头条登录后的元素选择器
+    # 存在此元素说明已登录
+    toutiao_logged_in_selector: str = Field(
+        default=".user-card.logged",
+        description="今日头条登录后的元素选择器（存在则已登录）",
     )

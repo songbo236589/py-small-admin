@@ -11,6 +11,7 @@ from Modules.admin.middleware import require_authentication
 from .ai import router as router_ai
 from .article import router as router_article
 from .category import router as router_category
+from .dashboard import router as router_dashboard
 from .extension import extension_router
 from .platform_account import router as router_platform_account
 from .publish import router as router_publish
@@ -36,6 +37,16 @@ main_router.include_router(
 # 分类管理路由 - 需要认证
 main_router.include_router(
     router_category,
+    dependencies=[
+        Depends(bearer_security),
+        Depends(api_key_security),
+        Depends(require_authentication()),
+    ],
+)
+
+# Dashboard 统计路由 - 需要认证
+main_router.include_router(
+    router_dashboard,
     dependencies=[
         Depends(bearer_security),
         Depends(api_key_security),

@@ -1,14 +1,14 @@
 import { useModel } from '@umijs/max';
-import { Card, theme, Row, Col, Statistic } from 'antd';
-import React from 'react';
+import { Card, message, theme, Row, Col, Statistic, Spin } from 'antd';
+import React, { useEffect, useState } from 'react';
 import {
   FileTextOutlined,
   FolderOutlined,
   TagsOutlined,
   UserSwitchOutlined,
   SendOutlined,
-  EyeOutlined,
 } from '@ant-design/icons';
+import { getStatistics } from '@/services/content/dashboard/api';
 
 /**
  * 内容统计卡片
@@ -112,6 +112,25 @@ const ContentCard: React.FC<{
 const Index: React.FC = () => {
   const { token } = theme.useToken();
   const { initialState } = useModel('@@initialState');
+  const [loading, setLoading] = useState(true);
+  const [statistics, setStatistics] = useState<API.ContentDashboardStatistics | null>(null);
+
+  // 获取统计数据
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      try {
+        const response = await getStatistics();
+        if (response.data) {
+          setStatistics(response.data);
+        }
+      } catch (error) {
+        message.error('获取统计数据失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStatistics();
+  }, []);
 
   return (
     <Card
@@ -156,138 +175,113 @@ const Index: React.FC = () => {
         </p>
 
         {/* 内容统计卡片 */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <ContentCard
-              title="文章总数"
-              count={128}
-              icon={<FileTextOutlined />}
-              color="#1677FF"
-              description="已发布文章"
-              link="/content/manage/article"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <ContentCard
-              title="分类数量"
-              count={12}
-              icon={<FolderOutlined />}
-              color="#52C41A"
-              description="内容分类"
-              link="/content/manage/category"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <ContentCard
-              title="标签数量"
-              count={36}
-              icon={<TagsOutlined />}
-              color="#FA8C16"
-              description="文章标签"
-              link="/content/manage/tag"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <ContentCard
-              title="平台账号"
-              count={5}
-              icon={<UserSwitchOutlined />}
-              color="#13C2C2"
-              description="已绑定账号"
-              link="/content/manage/platform_account"
-            />
-          </Col>
-        </Row>
+        <Spin spinning={loading}>
+          <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <ContentCard
+                title="文章总数"
+                count={statistics?.article_count ?? 0}
+                icon={<FileTextOutlined />}
+                color="#1677FF"
+                description="已发布文章"
+                link="/content/manage/article"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <ContentCard
+                title="分类数量"
+                count={statistics?.category_count ?? 0}
+                icon={<FolderOutlined />}
+                color="#52C41A"
+                description="内容分类"
+                link="/content/manage/category"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <ContentCard
+                title="标签数量"
+                count={statistics?.tag_count ?? 0}
+                icon={<TagsOutlined />}
+                color="#FA8C16"
+                description="文章标签"
+                link="/content/manage/tag"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <ContentCard
+                title="平台账号"
+                count={statistics?.platform_account_count ?? 0}
+                icon={<UserSwitchOutlined />}
+                color="#13C2C2"
+                description="已绑定账号"
+                link="/content/manage/platform_account"
+              />
+            </Col>
+          </Row>
+        </Spin>
 
         {/* 快速统计 */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8}>
-            <Card
-              title="发布统计"
-              bordered={false}
-              style={{ height: '100%' }}
-            >
-              <Row gutter={[16, 16]}>
-                <Col span={8}>
-                  <Statistic
-                    title="今日发布"
-                    value={3}
-                    valueStyle={{ color: '#3f8600' }}
-                    prefix={<SendOutlined />}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="待发布"
-                    value={8}
-                    valueStyle={{ color: '#cf1322' }}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="总发布量"
-                    value={156}
-                    suffix="篇"
-                  />
-                </Col>
-              </Row>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Card
-              title="浏览统计"
-              bordered={false}
-              style={{ height: '100%' }}
-            >
-              <Row gutter={[16, 16]}>
-                <Col span={8}>
-                  <Statistic
-                    title="今日浏览"
-                    value={1234}
-                    prefix={<EyeOutlined />}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="本周浏览"
-                    value={8625}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="总浏览量"
-                    value={45678}
-                  />
-                </Col>
-              </Row>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Card
-              title="快捷操作"
-              bordered={false}
-              style={{ height: '100%' }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                }}
+        <Spin spinning={loading}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
+              <Card
+                title="发布统计"
+                bordered={false}
+                style={{ height: '100%' }}
               >
-                <a href="/content/manage/article" style={{ fontSize: '14px' }}>
-                  <FileTextOutlined /> 新建文章
-                </a>
-                <a href="/content/manage/category" style={{ fontSize: '14px' }}>
-                  <FolderOutlined /> 管理分类
-                </a>
-                <a href="/content/manage/publish" style={{ fontSize: '14px' }}>
-                  <SendOutlined /> 发布管理
-                </a>
-              </div>
-            </Card>
-          </Col>
-        </Row>
+                <Row gutter={[16, 16]}>
+                  <Col span={8}>
+                    <Statistic
+                      title="今日发布"
+                      value={statistics?.publish?.today ?? 0}
+                      valueStyle={{ color: '#3f8600' }}
+                      prefix={<SendOutlined />}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      title="待发布"
+                      value={statistics?.publish?.pending ?? 0}
+                      valueStyle={{ color: '#cf1322' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      title="总发布量"
+                      value={statistics?.publish?.total ?? 0}
+                      suffix="篇"
+                    />
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Card
+                title="快捷操作"
+                bordered={false}
+                style={{ height: '100%' }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <a href="/content/manage/article" style={{ fontSize: '14px' }}>
+                    <FileTextOutlined /> 新建文章
+                  </a>
+                  <a href="/content/manage/category" style={{ fontSize: '14px' }}>
+                    <FolderOutlined /> 管理分类
+                  </a>
+                  <a href="/content/manage/publish" style={{ fontSize: '14px' }}>
+                    <SendOutlined /> 发布管理
+                  </a>
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </Spin>
       </div>
     </Card>
   );

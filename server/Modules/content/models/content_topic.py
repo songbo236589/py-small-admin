@@ -5,12 +5,18 @@
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Column, DateTime, SmallInteger, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, SmallInteger, String, Text
 from sqlalchemy.dialects.mysql import INTEGER
-from sqlmodel import Field
+from sqlalchemy.orm import Mapped
+from sqlmodel import Field, Relationship
 
 from Modules.common.models.base_model import BaseTableModel
+
+if TYPE_CHECKING:
+    from Modules.content.models.content_article import ContentArticle
+    from Modules.content.models.content_category import ContentCategory
 
 
 class ContentTopic(BaseTableModel, table=True):
@@ -100,9 +106,15 @@ class ContentTopic(BaseTableModel, table=True):
         default=0,
     )
 
-    # 分类/话题标签
-    category: str | None = Field(
-        sa_column=Column(String(100), nullable=True, comment="分类/话题标签", index=True),
+    # 分类ID（关联 content_categorys）
+    category_id: int | None = Field(
+        sa_column=Column(
+            INTEGER(unsigned=True),
+            ForeignKey("content_categorys.id", ondelete="SET NULL"),
+            nullable=True,
+            comment="分类ID，关联 content_categorys.id",
+            index=True,
+        ),
         default=None,
     )
 
@@ -147,6 +159,37 @@ class ContentTopic(BaseTableModel, table=True):
         default=None,
     )
 
+    # 知乎内容（JSON 格式存储抓取的问题详情）
+    zhihu_content: str | None = Field(
+        sa_column=Column(
+            Text,
+            nullable=True,
+            comment="知乎问题内容（JSON格式）：{title, description, url, answers: [{author, content}], fetched_at, answer_count}",
+        ),
+        default=None,
+    )
+
+    # 知乎内容更新时间
+    zhihu_content_updated_at: datetime | None = Field(
+        sa_column=Column(
+            DateTime(),
+            nullable=True,
+            comment="知乎内容更新时间",
+        ),
+        default=None,
+    )
+
+    # 文章数量（冗余字段，用于提高查询性能）
+    article_count: int = Field(
+        sa_column=Column(
+            INTEGER(unsigned=True),
+            nullable=False,
+            server_default="0",
+            comment="文章数量",
+        ),
+        default=0,
+    )
+
     created_at: datetime | None = Field(
         sa_column=Column(DateTime(), nullable=False, comment="创建时间"),
         default=None,
@@ -155,6 +198,16 @@ class ContentTopic(BaseTableModel, table=True):
     updated_at: datetime | None = Field(
         sa_column=Column(DateTime(), nullable=True, comment="更新时间"),
         default=None,
+    )
+
+    # 多对一：多个话题 → 一个分类
+    category: Mapped[Optional["ContentCategory"]] = Relationship(
+        back_populates="topics"
+    )
+
+    # 一对多：一个话题 → 多篇文章
+    articles: Mapped[list["ContentArticle"]] = Relationship(
+        back_populates="topic"
     )
 
     class Config:

@@ -84,6 +84,13 @@ class TagController:
             }
         )
 
+    async def quick_add(
+        self,
+        name: str = Form(..., description="标签名称"),
+    ) -> JSONResponse:
+        """快速创建标签（用于前端输入标签时自动创建）"""
+        return await self.tag_service.quick_add(name)
+
     @validate_request_data(IdRequest)
     async def edit(self, id: int = Path(..., description="标签ID")) -> JSONResponse:
         """获取标签信息（用于编辑）"""
@@ -157,3 +164,20 @@ class TagController:
     ) -> JSONResponse:
         """标签批量删除"""
         return await self.tag_service.destroy_all(request.id_array)
+
+    async def popular(
+        self,
+        limit: int = Query(100, description="返回数量限制", ge=1, le=500),
+        status: int = Query(1, description="状态：0=禁用, 1=启用"),
+    ) -> JSONResponse:
+        """获取常用标签（按使用频率排序）"""
+        return await self.tag_service.popular({"limit": limit, "status": status})
+
+    async def search(
+        self,
+        keyword: str = Query(..., min_length=1, description="搜索关键词"),
+        limit: int = Query(50, description="返回数量限制", ge=1, le=200),
+        status: int = Query(1, description="状态：0=禁用, 1=启用"),
+    ) -> JSONResponse:
+        """搜索标签"""
+        return await self.tag_service.search({"keyword": keyword, "limit": limit, "status": status})

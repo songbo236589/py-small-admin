@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .content_category import ContentCategory
     from .content_publish_log import ContentPublishLog
     from .content_tag import ContentTag
+    from .content_topic import ContentTopic
 
 
 class ContentArticle(BaseTableModel, table=True):
@@ -104,6 +105,17 @@ class ContentArticle(BaseTableModel, table=True):
         default=None,
     )
 
+    # 话题ID
+    topic_id: int | None = Field(
+        sa_column=Column(
+            INTEGER(unsigned=True),
+            ForeignKey("content_topics.id", ondelete="SET NULL"),
+            nullable=True,
+            comment="话题ID",
+        ),
+        default=None,
+    )
+
     # 浏览次数
     view_count: int = Field(
         sa_column=Column(
@@ -136,6 +148,11 @@ class ContentArticle(BaseTableModel, table=True):
         back_populates="articles"
     )
 
+    # 多对一：文章 → 话题
+    topic: Mapped[Optional["ContentTopic"]] = Relationship(
+        back_populates="articles"
+    )
+
     # 多对多：文章 ↔ 标签
     tags: Mapped[list["ContentTag"]] = Relationship(
         back_populates="articles",
@@ -151,6 +168,7 @@ class ContentArticle(BaseTableModel, table=True):
     __table_args__ = (
         Index("idx_author_status", "author_id", "status"),
         Index("idx_category_status", "category_id", "status"),
+        Index("idx_topic_status", "topic_id", "status"),
         Index("idx_status_created", "status", "created_at"),
     )
 

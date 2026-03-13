@@ -57,6 +57,17 @@ class ContentPublishLog(BaseTableModel, table=True):
         default="",
     )
 
+    # 平台账号ID
+    platform_account_id: int = Field(
+        sa_column=Column(
+            INTEGER(unsigned=True),
+            ForeignKey("content_platform_accounts.id", ondelete="SET NULL"),
+            nullable=True,
+            comment="平台账号ID",
+        ),
+        default=0,
+    )
+
     # 平台文章ID
     platform_article_id: str | None = Field(
         sa_column=Column(
@@ -125,6 +136,11 @@ class ContentPublishLog(BaseTableModel, table=True):
 
     # 多对一：发布日志 → 文章
     article: Mapped[Optional["ContentArticle"]] = Relationship(
+        back_populates="publish_logs"
+    )
+
+    # 多对一：发布日志 → 平台账号
+    platform_account: Mapped[Optional["ContentPlatformAccount"]] = Relationship(
         back_populates="publish_logs"
     )
 

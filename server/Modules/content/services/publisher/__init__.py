@@ -5,10 +5,14 @@
 """
 
 from .base_platform_handler import BasePlatformHandler, PublishResult
+from .toutiao_handler import ToutiaoHandler
+from .xiaohongshu_handler import XiaohongshuHandler
 from .zhihu_handler import ZhihuHandler
 
 __all__ = [
     "BasePlatformHandler",
     "PublishResult",
+    "ToutiaoHandler",
+    "XiaohongshuHandler",
     "ZhihuHandler",
 ]

@@ -11,9 +11,8 @@ export async function getModels() {
 export async function generateArticle(data: {
   id: number;
   mode: string;
-  title: string;
-  description?: string;
   model?: string;
+  variant_index?: number;
 }) {
   return request({
     method: 'POST',

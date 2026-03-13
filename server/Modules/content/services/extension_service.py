@@ -20,6 +20,29 @@ PLATFORM_DOMAIN_MAP = {
         "domains": ["zhihu.com", "www.zhihu.com"],
         "icon": "https://static.zhihu.com/heifetz/favicon.ico",
     },
+    "xiaohongshu": {
+        "name": "小红书",
+        "domains": [
+            "xiaohongshu.com",
+            "www.xiaohongshu.com",
+            "edith.xiaohongshu.com",
+            "fe.xiaohongshu.com",
+            "xhslink.com",
+        ],
+        "icon": "https://www.xiaohongshu.com/favicon.ico",
+    },
+    "toutiao": {
+        "name": "今日头条",
+        "domains": [
+            "toutiao.com",
+            "www.toutiao.com",
+            "mp.toutiao.com",
+            "zijieapi.com",
+            "mon.zijieapi.com",
+            "toutiaostatic.com",
+        ],
+        "icon": "https://www.toutiao.com/favicon.ico",
+    },
 }
 
 
@@ -65,29 +88,26 @@ class ExtensionService:
             导入结果
         """
 
-        # 按域名分组Cookies
-        cookies_by_domain: dict[str, list[dict[str, Any]]] = {}
+        # 按平台分组Cookies（而不是按域名）
+        cookies_by_platform: dict[str, list[dict[str, Any]]] = {}
         for cookie in cookies_data:
             domain = cookie.get("domain", "")
-            # 移除域名前导点号
-            clean_domain = domain.lstrip(".")
-            if clean_domain not in cookies_by_domain:
-                cookies_by_domain[clean_domain] = []
-            cookies_by_domain[clean_domain].append(cookie)
+            # 识别平台
+            platform = self._identify_platform(domain.lstrip("."))
+            if not platform:
+                continue  # 跳过未知平台的 Cookie
 
-        # 识别平台并更新账号
+            if platform not in cookies_by_platform:
+                cookies_by_platform[platform] = []
+            cookies_by_platform[platform].append(cookie)
+
+        # 更新或创建账号
         updated_accounts = []
         created_accounts = []
         errors = []
 
         async with get_async_session() as session:
-            for domain, cookies in cookies_by_domain.items():
-                # 识别平台
-                platform = self._identify_platform(domain)
-                if not platform:
-                    errors.append(f"未知平台: {domain}")
-                    continue
-
+            for platform, cookies in cookies_by_platform.items():
                 # 查找现有账号
                 existing = await session.execute(
                     select(ContentPlatformAccount).where(
@@ -96,7 +116,7 @@ class ExtensionService:
                 )
                 account = existing.scalar_one_or_none()
 
-                # 构建Cookie JSON
+                # 构建Cookie JSON（合并该平台的所有 Cookie）
                 cookies_json = json.dumps(cookies, ensure_ascii=False)
 
                 if account:
@@ -112,7 +132,7 @@ class ExtensionService:
                             "id": account.id,
                             "platform": platform,
                             "account_name": account.account_name,
-                            "domain": domain,
+                            "cookies_count": len(cookies),
                         }
                     )
                 else:
@@ -139,7 +159,7 @@ class ExtensionService:
                             "id": new_account.id,
                             "platform": platform,
                             "account_name": new_account.account_name,
-                            "domain": domain,
+                            "cookies_count": len(cookies),
                         }
                     )
 
@@ -189,6 +209,8 @@ class ExtensionService:
         # 根据不同平台提取用户名的Cookie名称
         username_cookies = {
             "zhihu": ["z_c0"],
+            "xiaohongshu": ["a1", "web_session"],
+            "toutiao": ["sessionid", "sid_tt"],
         }
 
         key_names = username_cookies.get(platform, [])

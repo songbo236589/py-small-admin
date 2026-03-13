@@ -16,6 +16,12 @@ from Modules.common.libs.validation.pagination_validator import (
     PaginationRequest,
 )
 from Modules.content.services.topic_service import TopicService
+from Modules.content.validators.topic_validator import (
+    BatchUpdateCategoryRequest,
+    GenerateDescriptionRequest,
+    UpdateCategoryRequest,
+    UpdateDescriptionRequest,
+)
 
 
 class TopicController:
@@ -33,6 +39,8 @@ class TopicController:
         platform: str | None = Query(None, description="平台标识"),
         status: int | None = Query(None, description="状态"),
         category: str | None = Query(None, description="分类"),
+        category_id: str | int | None = Query(None, description="分类ID"),
+        has_description: str | None = Query(None, description="描述状态：all/has/none"),
         sort: str | None = Query(None, description="排序规则"),
     ) -> JSONResponse:
         """获取话题列表或搜索话题（统一接口）"""
@@ -43,6 +51,8 @@ class TopicController:
                 "platform": platform,
                 "status": status,
                 "category": category,
+                "category_id": category_id,
+                "has_description": has_description,
                 "sort": sort,
             }
         )
@@ -93,3 +103,61 @@ class TopicController:
     ) -> JSONResponse:
         """批量删除话题"""
         return await self.topic_service.destroy_all(request.id_array)
+
+    @validate_body_data(BatchUpdateCategoryRequest)
+    async def batch_update_category(
+        self,
+        request: BatchUpdateCategoryRequest = Body(...),
+    ) -> JSONResponse:
+        """批量更新话题分类"""
+        return await self.topic_service.batch_update_category(
+            request.id_array, request.category_id
+        )
+
+    @validate_request_data(IdRequest)
+    @validate_request_data(GenerateDescriptionRequest)
+    async def generate_description(
+        self,
+        id: int = Path(..., description="话题ID"),
+        model: str | None = Form(None, description="AI 模型（可选）"),
+    ) -> JSONResponse:
+        """AI 生成话题描述"""
+        return await self.topic_service.generate_and_update_description(id, model)
+
+    @validate_request_data(IdRequest)
+    @validate_request_data(UpdateDescriptionRequest)
+    async def update_description(
+        self,
+        id: int = Path(..., description="话题ID"),
+        description: str = Form(..., description="描述内容"),
+    ) -> JSONResponse:
+        """更新话题描述"""
+        return await self.topic_service.update_description(id, description)
+
+    @validate_request_data(IdRequest)
+    @validate_request_data(UpdateCategoryRequest)
+    async def update_category(
+        self,
+        id: int = Path(..., description="话题ID"),
+        category_id: int | None = Form(None, description="分类ID"),
+    ) -> JSONResponse:
+        """更新话题分类"""
+        return await self.topic_service.update_category(id, category_id)
+
+    @validate_request_data(IdRequest)
+    @validate_request_data(GenerateDescriptionRequest)
+    async def generate_category(
+        self,
+        id: int = Path(..., description="话题ID"),
+        model: str | None = Form(None, description="AI 模型（可选）"),
+    ) -> JSONResponse:
+        """AI 生成话题分类"""
+        return await self.topic_service.generate_and_update_category(id, model)
+
+    @validate_request_data(IdRequest)
+    async def fetch_zhihu_content(
+        self,
+        id: int = Path(..., description="话题ID"),
+    ) -> JSONResponse:
+        """手动抓取知乎问题内容"""
+        return await self.topic_service.fetch_zhihu_content(id)

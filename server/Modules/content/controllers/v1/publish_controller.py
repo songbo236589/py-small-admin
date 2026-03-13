@@ -82,13 +82,20 @@ class PublishController:
         limit: int = Query(20, description="每页返回多少条记录"),
         platform: str | None = Query(None, description="发布平台"),
         status: int | None = Query(None, description="状态"),
-        article_id: int | None = Query(None, description="文章ID"),
+        article_title: str | None = Query(None, description="文章标题"),
+        account_name: str | None = Query(None, description="账号名称"),
         sort: str | None = Query(None, description="排序规则"),
         created_at_start: str | None = Query(
             None, alias="created_at[start]", description="创建时间开始"
         ),
         created_at_end: str | None = Query(
             None, alias="created_at[end]", description="创建时间结束"
+        ),
+        completed_at_start: str | None = Query(
+            None, alias="completed_at[start]", description="完成时间开始"
+        ),
+        completed_at_end: str | None = Query(
+            None, alias="completed_at[end]", description="完成时间结束"
         ),
     ) -> JSONResponse:
         """发布记录列表"""
@@ -98,10 +105,13 @@ class PublishController:
                 "limit": limit,
                 "platform": platform,
                 "status": status,
-                "article_id": article_id,
+                "article_title": article_title,
+                "account_name": account_name,
                 "sort": sort,
                 "created_at_start": created_at_start,
                 "created_at_end": created_at_end,
+                "completed_at_start": completed_at_start,
+                "completed_at_end": completed_at_end,
             }
         )
 

@@ -11,7 +11,7 @@ from sqlmodel import select
 
 from Modules.common.libs.database.sql.session import get_async_session
 from Modules.common.libs.responses.response import error, success
-from Modules.common.libs.time.utils import format_datetime
+from Modules.common.libs.time.utils import format_datetime, now
 from Modules.common.libs.validation.pagination_validator import CustomParams
 from Modules.common.services.base_service import BaseService
 from Modules.content.models.content_tag import ContentTag
@@ -106,6 +106,59 @@ class TagService(BaseService):
             return error("标签别名已存在")
 
         return data, session
+
+    async def quick_add(self, name: str) -> JSONResponse:
+        """快速创建标签（用于前端输入标签时自动创建）
+
+        Args:
+            name: 标签名称
+
+        Returns:
+            JSONResponse: 创建的标签信息（包含 ID）
+        """
+        from loguru import logger
+
+        logger.info(f"[quick_add] 快速创建标签: {name}")
+
+        async with get_async_session() as session:
+            # 检查标签是否已存在
+            existing_tag = await session.execute(
+                select(ContentTag).where(ContentTag.name == name)
+            )
+            tag = existing_tag.scalar_one_or_none()
+
+            if tag:
+                logger.info(f"[quick_add] 标签已存在: {name}, ID: {tag.id}")
+                return success(
+                    {
+                        "id": tag.id,
+                        "name": tag.name,
+                        "slug": tag.slug,
+                    }
+                )
+
+            # 创建新标签
+            logger.info(f"[quick_add] 创建新标签: {name}")
+            new_tag = ContentTag(
+                name=name,
+                slug=name,  # 直接使用 name 作为 slug
+                status=1,
+                sort=999,
+                created_at=now(),
+                updated_at=now(),
+            )
+            session.add(new_tag)
+            await session.commit()
+            await session.refresh(new_tag)
+
+            logger.info(f"[quick_add] 标签创建成功: {name}, ID: {new_tag.id}")
+            return success(
+                {
+                    "id": new_tag.id,
+                    "name": new_tag.name,
+                    "slug": new_tag.slug,
+                }
+            )
 
     async def edit(self, id: int) -> JSONResponse:
         """获取标签信息（用于编辑）"""
@@ -235,11 +288,127 @@ class TagService(BaseService):
         """
         from Modules.content.models.content_article_tag import ContentArticleTag
 
-        # 检查是否有关联的文章
+        # 检查是否有关联的文章（使用 first() 而非 scalar_one_or_none()，因为批量删除可能返回多行）
         articles = await session.execute(
             select(ContentArticleTag).where(ContentArticleTag.tag_id.in_(id_array))  # type: ignore
         )
-        if articles.scalar_one_or_none():
+        if articles.scalars().first():
             return error("所选标签中已关联文章，无法删除")
 
         return id_array, session
+
+    async def popular(self, params: dict[str, Any]) -> JSONResponse:
+        """获取常用标签（按使用频率排序）
+
+        Args:
+            params: 包含 limit 和 status 的字典
+
+        Returns:
+            JSONResponse: 常用标签列表
+        """
+        from loguru import logger
+
+        limit = params.get("limit", 100)
+        status = params.get("status", 1)
+
+        logger.info(f"[popular] 获取常用标签, limit={limit}, status={status}")
+
+        async with get_async_session() as session:
+            # 联表查询标签及其使用次数
+            # 使用 LEFT JOIN 确保即使没有文章的标签也会被查出来
+            # 然后按使用次数降序排序
+            from sqlalchemy import func
+
+            from Modules.content.models.content_article_tag import ContentArticleTag
+
+            query = (
+                select(
+                    ContentTag.id,
+                    ContentTag.name,
+                    ContentTag.slug,
+                    ContentTag.color,
+                    ContentTag.status,
+                    ContentTag.sort,
+                    ContentTag.created_at,
+                    ContentTag.updated_at,
+                    func.count(ContentArticleTag.article_id).label("usage_count"),
+                )
+                .outerjoin(ContentArticleTag, ContentTag.id == ContentArticleTag.tag_id)
+                .where(ContentTag.status == status)
+                .group_by(ContentTag.id)
+                .order_by(
+                    func.count(ContentArticleTag.article_id).desc(),
+                    ContentTag.sort.asc(),
+                )
+                .limit(limit)
+            )
+
+            result = await session.execute(query)
+            tags = result.all()
+
+            items = []
+            for tag in tags:
+                items.append(
+                    {
+                        "id": tag.id,
+                        "name": tag.name,
+                        "slug": tag.slug,
+                        "color": tag.color,
+                        "status": tag.status,
+                        "sort": tag.sort,
+                        "created_at": format_datetime(tag.created_at),
+                        "updated_at": format_datetime(tag.updated_at),
+                        "usage_count": tag.usage_count or 0,  # 文章数
+                    }
+                )
+
+            return success({"items": items, "total": len(items)})
+
+    async def search(self, params: dict[str, Any]) -> JSONResponse:
+        """搜索标签
+
+        Args:
+            params: 包含 keyword, limit, status 的字典
+
+        Returns:
+            JSONResponse: 搜索结果
+        """
+        from loguru import logger
+
+        keyword = params.get("keyword", "")
+        limit = params.get("limit", 50)
+        status = params.get("status", 1)
+
+        logger.info(
+            f"[search] 搜索标签, keyword={keyword}, limit={limit}, status={status}"
+        )
+
+        async with get_async_session() as session:
+            # 模糊搜索标签名称
+            query = (
+                select(ContentTag)
+                .where(ContentTag.status == status)
+                .where(ContentTag.name.contains(keyword))
+                .order_by(ContentTag.sort.asc(), ContentTag.created_at.desc())
+                .limit(limit)
+            )
+
+            result = await session.execute(query)
+            tags = result.scalars().all()
+
+            items = []
+            for tag in tags:
+                items.append(
+                    {
+                        "id": tag.id,
+                        "name": tag.name,
+                        "slug": tag.slug,
+                        "color": tag.color,
+                        "status": tag.status,
+                        "sort": tag.sort,
+                        "created_at": format_datetime(tag.created_at),
+                        "updated_at": format_datetime(tag.updated_at),
+                    }
+                )
+
+            return success({"items": items, "total": len(items)})

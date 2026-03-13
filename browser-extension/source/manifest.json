@@ -25,7 +25,9 @@
   ],
   "host_permissions": [
     "http://localhost/*",
-    "https://*/*"
+    "https://*/*",
+    "*://*.xiaohongshu.com/*",
+    "*://*.xhslink.com/*"
   ],
   "background": {
     "service_worker": "js/background.js"

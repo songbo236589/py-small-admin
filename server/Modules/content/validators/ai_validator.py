@@ -14,9 +14,8 @@ class AIGenerateArticleRequest(BaseModel):
 
     id: int = Field(..., gt=0, description="话题ID")
     mode: str = Field(..., description="生成模式: title/description/full")
-    title: str = Field(..., description="问题标题")
-    description: str | None = Field(None, description="问题描述")
     model: str | None = Field(None, description="指定模型（可选）")
+    variant_index: int = Field(0, ge=0, description="变体索引，用于生成不同版本的文章（可选）")
 
     @field_validator("id")
     @classmethod
@@ -34,28 +33,6 @@ class AIGenerateArticleRequest(BaseModel):
         if v not in valid_modes:
             raise ValueError(f"生成模式只能是: {', '.join(valid_modes)}")
         return v
-
-    @field_validator("title")
-    @classmethod
-    def validate_title(cls, v):
-        """验证问题标题"""
-        if not v or len(v.strip()) == 0:
-            raise ValueError("问题标题不能为空")
-        v = v.strip()
-        if len(v) > 500:
-            raise ValueError("问题标题长度不能超过500个字符")
-        return v
-
-    @field_validator("description")
-    @classmethod
-    def validate_description(cls, v):
-        """验证问题描述"""
-        if v is None:
-            return None
-        v = v.strip()
-        if len(v) > 5000:
-            raise ValueError("问题描述长度不能超过5000个字符")
-        return v if v else None
 
     @field_validator("model")
     @classmethod

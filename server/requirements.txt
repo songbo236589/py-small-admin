@@ -133,6 +133,14 @@ akshare==1.18.21
 # 用于实现浏览器自动化操作，支持 Cookie 验证和文章发布功能
 playwright==1.58.0
 
+# Playwright Stealth - 反检测插件
+# 用于隐藏 Playwright 自动化特征，避免被网站检测为爬虫
+playwright-stealth==1.0.6
+
+# Setuptools - Python 打包和分发工具
+# playwright-stealth 的依赖，用于资源管理
+setuptools==75.8.0
+
 # Markdownify - HTML 转 Markdown 库
 # 用于将富文本编辑器生成的 HTML 转换为 Markdown 格式，便于发布到支持 Markdown 的平台
 markdownify==1.2.2

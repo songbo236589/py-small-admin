@@ -1,6 +1,6 @@
 # AI 生成功能
 
-本系统集成了 Ollama AI 服务，支持使用本地大语言模型生成文章内容。
+本系统集成了多个 AI 提供商（Ollama、智谱AI），支持使用本地或云端大语言模型生成文章内容。
 
 ## 功能概述
 
@@ -10,12 +10,23 @@
 
 | 模型 | 大小 | 说明 |
 |------|------|------|
-| qwen2.5:7b | ~4.5GB | 通义千问 2.5，默认模型 |
+| qwen2.5:7b | ~4.5GB | 通义千问 2.5 |
 | qwen2.5:14b | ~9GB | 更大更准确 |
 | llama3.2:8b | ~4.7GB | Meta Llama 3.2 |
 | mistral:7b | ~4.1GB | Mistral AI |
 
 更多模型请访问：https://ollama.com/library
+
+通过智谱AI，系统支持多种云端大语言模型：
+
+| 模型 | 说明 |
+|------|------|
+| glm-4-flash-250414 | 最新免费模型，速度快 |
+| glm-4.7-flash | 新版 Flash 模型 |
+| glm-4-air | 轻量级模型 |
+| glm-4-plus | 强力模型，适合深度生成 |
+
+更多模型请访问：https://open.bigmodel.cn/
 
 ### 生成模式
 
@@ -41,20 +52,20 @@ ollama pull qwen2.5:7b
 
 ### 3. 配置环境变量
 
-在 `.env` 文件中配置（可选，有默认值）：
+在 `.env` 文件中配置：
 
 ```bash
-# Ollama 服务地址
+# Ollama AI 配置（本地 AI）
+CONTENT_OLLAMA_ENABLED=true
 CONTENT_OLLAMA_BASE_URL=http://localhost:11434
-
-# Ollama 默认模型
-CONTENT_OLLAMA_MODEL=qwen2.5:7b
-
-# AI 生成超时时间（秒）
 CONTENT_OLLAMA_TIMEOUT=120
 
-# 是否启用 AI 功能
-CONTENT_OLLAMA_ENABLED=true
+# 智谱AI 配置（云端 AI）
+CONTENT_ZHIPU_ENABLED=true
+CONTENT_ZHIPU_API_KEY=your-api-key
+CONTENT_ZHIPU_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+CONTENT_ZHIPU_TIMEOUT=120
+CONTENT_ZHIPU_MODELS=[{"name":"glm-4-flash-250414","label":"GLM-4-Flash","description":"最新免费模型，速度快"}]
 ```
 
 ### 4. 使用 AI 生成文章
@@ -108,7 +119,7 @@ model: qwen2.5:7b
 | mode | string | 是 | 生成模式：title/description/full |
 | title | string | 是 | 问题标题 |
 | description | string | 否 | 问题描述 |
-| model | string | 否 | 指定模型（可选，不指定则使用配置文件中的默认模型） |
+| model | string | 是 | 指定 AI 模型（必填） |
 
 **响应示例**：
 ```json
@@ -128,7 +139,7 @@ model: qwen2.5:7b
 
 ### 技术栈
 
-- **AI 服务**：Ollama（本地大语言模型运行工具）
+- **AI 服务**：Ollama（本地大语言模型运行工具）、智谱AI（云端大语言模型服务）
 - **HTTP 客户端**：httpx（异步 HTTP 请求）
 - **数据验证**：Pydantic（参数验证）
 
@@ -203,12 +214,22 @@ model: qwen2.5:7b
 
 ### 1. 模型选择
 
+#### Ollama 本地模型
+
 | 场景 | 推荐模型 | 原因 |
 |------|----------|------|
 | 日常使用 | qwen2.5:7b | 速度快，质量好 |
 | 长文章 | qwen2.5:14b | 理解能力更强 |
 | 英文内容 | llama3.2:8b | 英文语料更好 |
 | 资源受限 | mistral:7b | 内存占用较少 |
+
+#### 智谱AI 云端模型
+
+| 场景 | 推荐模型 | 原因 |
+|------|----------|------|
+| 日常使用 | glm-4-flash-250414 | 免费模型，速度快 |
+| 高质量生成 | glm-4-plus | 强力模型，适合深度生成 |
+| 快速响应 | glm-4-air | 轻量级模型，响应快 |
 
 ### 2. 生成模式选择
 
@@ -269,6 +290,7 @@ ollama pull qwen2.5:7b
 ## 相关文档
 
 - [Ollama 官方文档](https://ollama.com/docs)
+- [智谱AI 官方文档](https://open.bigmodel.cn/)
 - [安装指南 - Ollama 安装](../../getting-started/install.md#42-安装-ollama可选)
-- [环境变量配置 - Ollama AI 配置](../config/env-variables.md#ollama-ai-配置)
+- [环境变量配置 - AI 配置](../config/env-variables.md)
 - [Content API 文档](../api/content-api.md#ai-生成接口)

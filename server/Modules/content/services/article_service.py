@@ -12,13 +12,14 @@ from sqlmodel import select
 
 from Modules.common.libs.database.sql.session import get_async_session
 from Modules.common.libs.responses.response import error, success
-from Modules.common.libs.time.utils import format_datetime
+from Modules.common.libs.time.utils import format_datetime, now
 from Modules.common.libs.validation.pagination_validator import CustomParams
 from Modules.common.services.base_service import BaseService
 from Modules.content.models.content_article import ContentArticle
 from Modules.content.models.content_article_tag import ContentArticleTag
 from Modules.content.models.content_category import ContentCategory
 from Modules.content.models.content_tag import ContentTag
+from Modules.content.models.content_topic import ContentTopic
 
 
 class ArticleService(BaseService):
@@ -34,7 +35,7 @@ class ArticleService(BaseService):
         # 模糊匹配字段字典
         data["fuzzy_fields"] = ["title", "summary"]
         # 精确匹配字段字典
-        data["exact_fields"] = ["status", "category_id", "author_id"]
+        data["exact_fields"] = ["status", "category_id", "topic_id", "author_id"]
         # 应用范围筛选
         data["range_fields"] = ["created_at", "updated_at", "published_at"]
 
@@ -43,6 +44,9 @@ class ArticleService(BaseService):
             query = select(ContentArticle).options(
                 selectinload(ContentArticle.category).load_only(
                     *[ContentCategory.id, ContentCategory.name]
+                ),
+                selectinload(ContentArticle.topic).load_only(
+                    *[ContentTopic.id, ContentTopic.title]
                 ),
                 selectinload(ContentArticle.tags).load_only(
                     *[ContentTag.id, ContentTag.name, ContentTag.color]
@@ -81,6 +85,8 @@ class ArticleService(BaseService):
                 )
                 # 获取分类名称
                 d["category_name"] = article.category.name if article.category else None
+                # 获取话题标题
+                d["topic_title"] = article.topic.title if article.topic else None
                 # 获取标签列表（完整对象）
                 d["tags"] = [
                     {"id": tag.id, "name": tag.name, "color": tag.color}
@@ -153,13 +159,68 @@ class ArticleService(BaseService):
             data: 原始数据
             session: 数据库会话
         """
+        from loguru import logger
+
+        logger.info(f"[_article_add_post_operation] 开始处理文章标签, article_id={instance.id}")
+        logger.debug(f"[_article_add_post_operation] 输入数据: tag_names={data.get('tag_names')}, tag_ids={data.get('tag_ids')}")
+
+        # 优先处理 AI 生成的标签名称
+        tag_names = data.get("tag_names")
+        if tag_names and len(tag_names) > 0:
+            logger.info(f"[_article_add_post_operation] 处理 AI 生成的标签名称: {tag_names}")
+            created_count = 0
+            existing_count = 0
+
+            for tag_name in tag_names:
+                # 检查标签是否已存在
+                existing_tag = await session.execute(
+                    select(ContentTag).where(ContentTag.name == tag_name)
+                )
+                tag = existing_tag.scalar_one_or_none()
+
+                if not tag:
+                    # 创建新标签
+                    logger.debug(f"[_article_add_post_operation] 创建新标签: {tag_name}")
+                    tag = ContentTag(
+                        name=tag_name,
+                        slug=tag_name,  # 直接使用 name 作为 slug
+                        status=1,
+                        sort=999,
+                        created_at=now(),
+                        updated_at=now(),
+                    )
+                    session.add(tag)
+                    await session.commit()
+                    await session.refresh(tag)
+                    created_count += 1
+                else:
+                    logger.debug(f"[_article_add_post_operation] 使用现有标签: {tag_name} (ID: {tag.id})")
+                    existing_count += 1
+
+                # 创建文章-标签关联
+                article_tag = ContentArticleTag(article_id=instance.id, tag_id=tag.id)  # type: ignore
+                session.add(article_tag)
+                logger.debug(f"[_article_add_post_operation] 创建文章-标签关联: article_id={instance.id}, tag_id={tag.id}")
+
+            await session.commit()
+            logger.info(f"[_article_add_post_operation] AI 标签处理完成 - 创建: {created_count}, 已存在: {existing_count}")
+            return
+
+        # 兼容原有的 tag_ids 逻辑
         tag_ids = data.get("tag_ids")
         if tag_ids and len(tag_ids) > 0:
+            logger.info(f"[_article_add_post_operation] 处理手动选择的标签 IDs: {tag_ids}")
             # 创建文章标签关联
             for tag_id in tag_ids:
                 article_tag = ContentArticleTag(article_id=instance.id, tag_id=tag_id)  # type: ignore
                 session.add(article_tag)
+                logger.debug(f"[_article_add_post_operation] 创建文章-标签关联: article_id={instance.id}, tag_id={tag_id}")
             await session.commit()
+            logger.info(f"[_article_add_post_operation] 手动标签处理完成 - 数量: {len(tag_ids)}")
+
+        # 更新话题的文章数量（如果有关联话题）
+        if instance.topic_id:
+            await self._update_topic_article_count(instance.topic_id, session)
 
     async def edit(self, id: int) -> JSONResponse:
         """获取文章信息（用于编辑）"""
@@ -218,6 +279,12 @@ class ArticleService(BaseService):
         Returns:
             验证失败时返回错误响应，成功时返回(data, session)
         """
+        # 查询当前文章，保存旧的 topic_id（用于后续更新文章数量）
+        article = await session.execute(select(ContentArticle).where(ContentArticle.id == id))
+        article = article.scalar_one_or_none()
+        if article:
+            data["_old_topic_id"] = article.topic_id
+
         # 验证分类是否存在
         category_id = data.get("category_id")
         if category_id is not None and category_id > 0:
@@ -247,7 +314,7 @@ class ArticleService(BaseService):
     async def _article_update_post_operation(
         self, instance: ContentArticle, data: dict[str, Any], session: Any
     ) -> None:
-        """文章更新后置操作 - 更新标签关联
+        """文章更新后置操作 - 更新标签关联和话题文章数量
 
         Args:
             instance: 更新的文章实例
@@ -283,16 +350,121 @@ class ArticleService(BaseService):
                     session.add(article_tag)
             await session.commit()
 
+        # 更新话题的文章数量（如果 topic_id 发生变化）
+        if "topic_id" in data:
+            old_topic_id = data.get("_old_topic_id")
+            new_topic_id = instance.topic_id
+            # 如果话题发生变化，需要更新旧话题和新话题的文章数量
+            if old_topic_id != new_topic_id:
+                if old_topic_id:
+                    await self._update_topic_article_count(old_topic_id, session)
+                if new_topic_id:
+                    await self._update_topic_article_count(new_topic_id, session)
+
     async def set_status(self, id: int, data: dict[str, Any]) -> JSONResponse:
         """文章状态"""
         return await self.common_update(id=id, data=data, model_class=ContentArticle)
 
+    async def _article_destroy_save_topic_id(self, id: int, session: Any) -> Any:
+        """文章删除前置操作 - 保存 topic_id
+
+        Args:
+            id: 文章ID
+            session: 数据库会话
+        """
+        # 查询文章，获取 topic_id 并保存到临时存储
+        topic_id = await session.execute(
+            select(ContentArticle.topic_id).where(ContentArticle.id == id)
+        )
+        topic_id = topic_id.scalar_one_or_none()
+        if topic_id:
+            # 保存到 session 的上下文中，供后置操作使用
+            if not hasattr(session, '_destroy_topic_ids'):
+                session._destroy_topic_ids = []
+            session._destroy_topic_ids.append(topic_id)
+
+    async def _article_destroy_post_operation(self, _id: int, session: Any) -> Any:
+        """文章删除后置操作 - 更新话题文章数量
+
+        Args:
+            id: 文章ID
+            session: 数据库会话
+        """
+        # 从临时存储中获取 topic_id 并更新
+        if hasattr(session, '_destroy_topic_ids') and session._destroy_topic_ids:
+            for topic_id in session._destroy_topic_ids:
+                await self._update_topic_article_count(topic_id, session)
+            delattr(session, '_destroy_topic_ids')
+
     async def destroy(self, id: int) -> JSONResponse:
         """文章删除"""
-        return await self.common_destroy(id=id, model_class=ContentArticle)
+        return await self.common_destroy(
+            id=id,
+            model_class=ContentArticle,
+            pre_operation_callback=self._article_destroy_save_topic_id,
+            post_operation_callback=self._article_destroy_post_operation,
+        )
 
     async def destroy_all(self, id_array: list[int]) -> JSONResponse:
         """文章批量删除"""
         return await self.common_destroy_all(
-            id_array=id_array, model_class=ContentArticle
+            id_array=id_array,
+            model_class=ContentArticle,
+            pre_operation_callback=self._article_destroy_all_save_topic_ids,
+            post_operation_callback=self._article_destroy_all_post_operation,
         )
+
+    async def _article_destroy_all_save_topic_ids(self, id_array: list[int], session: Any) -> Any:
+        """文章批量删除前置操作 - 保存 topic_id
+
+        Args:
+            id_array: 文章ID列表
+            session: 数据库会话
+        """
+        # 查询所有文章的 topic_id
+        articles = await session.execute(
+            select(ContentArticle.topic_id).where(ContentArticle.id.in_(id_array))
+        )
+        topic_ids = {row[0] for row in articles.all() if row[0]}
+
+        # 保存到 session 的上下文中，供后置操作使用
+        session._destroy_topic_ids = list(topic_ids)
+
+    async def _article_destroy_all_post_operation(self, _id_array: list[int], session: Any) -> Any:
+        """文章批量删除后置操作 - 更新话题文章数量
+
+        Args:
+            id_array: 文章ID列表
+            session: 数据库会话
+        """
+        # 从临时存储中获取 topic_id 并更新
+        if hasattr(session, '_destroy_topic_ids') and session._destroy_topic_ids:
+            for topic_id in session._destroy_topic_ids:
+                await self._update_topic_article_count(topic_id, session)
+            delattr(session, '_destroy_topic_ids')
+
+    async def _update_topic_article_count(self, topic_id: int, session: Any) -> None:
+        """更新话题的文章数量（统计该话题下的所有文章）
+
+        Args:
+            topic_id: 话题ID
+            session: 数据库会话
+        """
+        from sqlalchemy import func
+
+        # 统计该话题下的文章数量
+        result = await session.execute(
+            select(func.count(ContentArticle.id)).where(ContentArticle.topic_id == topic_id)
+        )
+        count = result.scalar() or 0
+
+        # 更新话题表的 article_count 字段
+        from Modules.content.models.content_topic import ContentTopic
+
+        topic = await session.execute(
+            select(ContentTopic).where(ContentTopic.id == topic_id)
+        )
+        topic = topic.scalar_one_or_none()
+        if topic:
+            topic.article_count = count
+            await session.commit()

@@ -28,6 +28,13 @@ router.post(
 )(controller.add)
 
 
+router.post(
+    "/quick_add",
+    response_model=dict[str, Any],
+    summary="快速创建标签",
+)(controller.quick_add)
+
+
 router.get(
     "/edit/{id}",
     response_model=dict[str, Any],
@@ -68,3 +75,17 @@ router.delete(
     response_model=dict[str, Any],
     summary="批量删除",
 )(controller.destroy_all)
+
+
+router.get(
+    "/popular",
+    response_model=dict[str, Any],
+    summary="获取常用标签（按使用频率排序）",
+)(controller.popular)
+
+
+router.get(
+    "/search",
+    response_model=dict[str, Any],
+    summary="搜索标签",
+)(controller.search)

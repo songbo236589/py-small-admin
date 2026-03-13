@@ -17,6 +17,7 @@ class ArticleAddUpdateRequest(BaseModel):
     summary: str | None = Field(None, description="文章摘要")
     cover_image_id: int | None = Field(None, description="封面图片ID")
     category_id: int | None = Field(None, description="分类ID")
+    topic_id: int | None = Field(None, description="话题ID")
     tag_ids: str | int | list[int] | None = Field(None, description="标签ID列表")
     status: int = Field(0, description="状态")
 

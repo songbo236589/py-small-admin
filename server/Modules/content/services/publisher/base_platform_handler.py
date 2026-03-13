@@ -11,6 +11,9 @@ from typing import Any
 
 from loguru import logger
 from playwright.async_api import Browser, Page
+from playwright_stealth import stealth_async
+
+from Modules.common.libs.config.config import Config
 
 # 默认 User-Agent（当数据库中没有存储时使用）
 # 这是常见的 Chrome 浏览器 User-Agent
@@ -69,9 +72,11 @@ class BasePlatformHandler(ABC):
         self.playwright = None
 
         # 记录初始化信息
+        cookie_names = [c.get('name', '') for c in cookies] if cookies else []
         logger.debug(
             f"[{self.platform_name}] 处理器初始化 - "
-            f"Cookie数量: {len(cookies)}, "
+            f"Cookie数量: {len(cookies) if cookies else 0}, "
+            f"Cookie名称: {cookie_names}, "
             f"UA: {(user_agent or DEFAULT_USER_AGENT)[:50]}..."
         )
 
@@ -149,13 +154,11 @@ class BasePlatformHandler(ABC):
         try:
             from playwright.async_api import async_playwright
 
-            from Modules.common.libs.config.registry import ConfigRegistry
-
             # 获取配置
-            config = ConfigRegistry.get("content")
+            config = Config.get("content")
             if config is None:
                 logger.error(
-                    f"[{self.platform_name}] ConfigRegistry.get('content') 返回 None"
+                    f"[{self.platform_name}] Config.get('content') 返回 None"
                 )
                 return {
                     "success": False,
@@ -193,34 +196,21 @@ class BasePlatformHandler(ABC):
                 f"[{self.platform_name}] ✓ 页面创建成功, viewport: {config.playwright_width}x{config.playwright_height}"
             )
 
+            # 应用 playwright-stealth 反检测
+            logger.debug(f"[{self.platform_name}] 应用 playwright-stealth 反检测...")
+            await stealth_async(self.page)
+
             # 设置默认超时时间
             self.page.set_default_timeout(config.playwright_timeout)
 
-            # 反检测：页面创建后随机延迟
-            if config.human_behavior_enabled:
-                delay = await self._random_delay(
-                    config.random_delay_min, config.random_delay_max
-                )
-                logger.debug(f"[{self.platform_name}] ✓ 延迟 {delay:.2f} 秒")
-
-            # 先访问平台域名（避免跨域问题）
-            logger.debug(
-                f"[{self.platform_name}] 访问平台域名: https://{self.platform_domain}"
-            )
-            await self.page.goto(f"https://{self.platform_domain}")
-
-            # 反检测：访问域名后随机延迟
-            if config.human_behavior_enabled:
-                delay = await self._random_delay(
-                    config.random_delay_min, config.random_delay_max
-                )
-                logger.debug(f"[{self.platform_name}] ✓ 延迟 {delay:.2f} 秒")
-
-            # 添加 Cookies
+            # 【修复】先添加 Cookies，再访问页面
+            # 这样可以确保Cookie在访问页面时就生效，避免被服务器返回的Set-Cookie覆盖
             converted_cookies = self._convert_cookies()
+            cookie_names = [c.get('name', '') for c in converted_cookies]
             logger.debug(
                 f"[{self.platform_name}] 添加 {len(converted_cookies)} 个 Cookie..."
             )
+            logger.debug(f"[{self.platform_name}] Cookie 名称列表: {cookie_names}")
             await context.add_cookies(converted_cookies)  # type: ignore
             logger.debug(f"[{self.platform_name}] ✓ Cookie 添加完成")
 
@@ -248,6 +238,27 @@ class BasePlatformHandler(ABC):
 
             # 反检测：模拟人类行为（滚动、鼠标移动）
             await self._simulate_human_behavior()
+
+            # 【新增】刷新页面（让Cookie完全生效，模拟真实用户行为）
+            if config.enable_page_refresh:
+                logger.info(f"[{self.platform_name}] ========== 刷新页面阶段 ==========")
+
+                # 刷新前随机延迟
+                delay = await self._random_delay(
+                    config.page_refresh_delay_min, config.page_refresh_delay_max
+                )
+                logger.debug(f"[{self.platform_name}] 刷新前延迟 {delay:.2f} 秒")
+
+                # 刷新页面
+                logger.debug(f"[{self.platform_name}] 正在刷新页面...")
+                await self.page.reload(wait_until="networkidle", timeout=10000)
+                logger.debug(f"[{self.platform_name}] ✓ 页面刷新完成")
+
+                # 刷新后随机延迟
+                delay = await self._random_delay(
+                    config.page_refresh_after_delay_min, config.page_refresh_after_delay_max
+                )
+                logger.debug(f"[{self.platform_name}] 刷新后延迟 {delay:.2f} 秒")
 
             # 检查登录状态
             logger.debug(f"[{self.platform_name}] 检查登录状态...")
@@ -318,13 +329,11 @@ class BasePlatformHandler(ABC):
         try:
             from playwright.async_api import async_playwright
 
-            from Modules.common.libs.config.registry import ConfigRegistry
-
             # 获取配置
-            config = ConfigRegistry.get("content")
+            config = Config.get("content")
             if config is None:
                 logger.error(
-                    f"[{self.platform_name}] ConfigRegistry.get('content') 返回 None"
+                    f"[{self.platform_name}] Config.get('content') 返回 None"
                 )
                 return PublishResult(
                     success=False,
@@ -362,34 +371,21 @@ class BasePlatformHandler(ABC):
                 f"[{self.platform_name}] ✓ 页面创建成功, viewport: {config.playwright_width}x{config.playwright_height}"
             )
 
+            # 应用 playwright-stealth 反检测
+            logger.debug(f"[{self.platform_name}] 应用 playwright-stealth 反检测...")
+            await stealth_async(self.page)
+
             # 设置默认超时时间
             self.page.set_default_timeout(config.playwright_timeout)
 
-            # 反检测：页面创建后随机延迟
-            if config.human_behavior_enabled:
-                delay = await self._random_delay(
-                    config.random_delay_min, config.random_delay_max
-                )
-                logger.debug(f"[{self.platform_name}] ✓ 延迟 {delay:.2f} 秒")
-
-            # 先访问平台域名（避免跨域问题）
-            logger.debug(
-                f"[{self.platform_name}] 访问平台域名: https://{self.platform_domain}"
-            )
-            await self.page.goto(f"https://{self.platform_domain}")
-
-            # 反检测：访问域名后随机延迟
-            if config.human_behavior_enabled:
-                delay = await self._random_delay(
-                    config.random_delay_min, config.random_delay_max
-                )
-                logger.debug(f"[{self.platform_name}] ✓ 延迟 {delay:.2f} 秒")
-
-            # 添加 Cookies
+            # 【修复】先添加 Cookies，再访问页面
+            # 这样可以确保Cookie在访问页面时就生效，避免被服务器返回的Set-Cookie覆盖
             converted_cookies = self._convert_cookies()
+            cookie_names = [c.get('name', '') for c in converted_cookies]
             logger.debug(
                 f"[{self.platform_name}] 添加 {len(converted_cookies)} 个 Cookie..."
             )
+            logger.debug(f"[{self.platform_name}] Cookie 名称列表: {cookie_names}")
             await context.add_cookies(converted_cookies)  # type: ignore
             logger.debug(f"[{self.platform_name}] ✓ Cookie 添加完成")
 
@@ -400,18 +396,65 @@ class BasePlatformHandler(ABC):
                 )
                 logger.debug(f"[{self.platform_name}] ✓ 延迟 {delay:.2f} 秒")
 
-            # 【修改】直接导航到发布页面验证登录状态
-            # 获取发布页面 URL
-            publish_url = await self.get_publish_url()
-            logger.debug(f"[{self.platform_name}] 导航到发布页面: {publish_url}")
+            # 【新增】在主站上预热 - 模拟真实用户行为
+            # 真实用户会先在主站浏览一段时间，然后再点击"写文章"
+            logger.info(f"[{self.platform_name}] ========== 主站预热阶段 ==========")
 
-            # 导航到发布页面
-            await self.page.goto(publish_url)
+            # 【修复】先访问主站页面
+            logger.debug(f"[{self.platform_name}] 访问主站: https://{self.platform_domain}")
+            await self.page.goto(f"https://{self.platform_domain}")
+
+            logger.debug(f"[{self.platform_name}] 等待主站完全加载...")
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=15000)
+                logger.debug(f"[{self.platform_name}] ✓ 主站加载完成")
+            except Exception:
+                # networkidle 可能会失败，但页面可能已经可用
+                logger.debug(f"[{self.platform_name}] 主站 networkidle 超时，继续执行")
+
+            # 反检测：主站加载后额外延迟
+            if config.human_behavior_enabled:
+                delay = await self._random_delay(2.0, 3.0)
+                logger.debug(f"[{self.platform_name}] ✓ 延迟 {delay:.2f} 秒")
+
+            # 在主站上模拟人类行为（滚动、鼠标移动）
+            await self._simulate_human_behavior()
+
+            # 反检测：模拟完成后再次延迟
+            if config.human_behavior_enabled:
+                delay = await self._random_delay(1.0, 2.0)
+                logger.debug(f"[{self.platform_name}] ✓ 延迟 {delay:.2f} 秒")
+
+            # 【改进】打开新标签页访问发布页面 - 模拟真实用户行为
+            # 真实用户通常会 Ctrl+点击 或右键"在新标签页中打开"写作页面
+            publish_url = await self.get_publish_url()
+            logger.info(f"[{self.platform_name}] ========== 打开新标签页访问写作页 ==========")
+            logger.debug(f"[{self.platform_name}] 写作页面 URL: {publish_url}")
+
+            # 反检测：打开新标签页前的延迟
+            if config.human_behavior_enabled:
+                delay = await self._random_delay(0.5, 1.5)
+                logger.debug(f"[{self.platform_name}] 打开新标签前延迟 {delay:.2f} 秒...")
+
+            # 创建新页面（模拟新标签页）
+            logger.debug(f"[{self.platform_name}] 正在打开新标签页...")
+            context = self.page.context
+            self.page = await context.new_page()
+            logger.debug(f"[{self.platform_name}] ✓ 新标签页已创建")
+
+            # 访问写作页面
+            logger.debug(f"[{self.platform_name}] 正在访问写作页面...")
+            await self.page.goto(publish_url, timeout=30000)
 
             # 等待页面加载完成
-            logger.debug(f"[{self.platform_name}] 等待发布页面加载...")
-            await self.page.wait_for_load_state("networkidle", timeout=10000)
-            logger.debug(f"[{self.platform_name}] ✓ 发布页面加载完成")
+            logger.debug(f"[{self.platform_name}] 等待写作页面加载...")
+            await self.page.wait_for_load_state("domcontentloaded", timeout=15000)
+            logger.debug(f"[{self.platform_name}] ✓ 写作页面基本加载完成")
+
+            # 额外等待，让 React 组件有时间渲染
+            logger.debug(f"[{self.platform_name}] 等待页面完全渲染...")
+            await asyncio.sleep(3)
+            logger.debug(f"[{self.platform_name}] ✓ 写作页面已就绪")
 
             # 检查是否出现登录页面（Cookie 失效）
             logger.debug(f"[{self.platform_name}] 检查是否跳转到登录页...")
@@ -435,9 +478,14 @@ class BasePlatformHandler(ABC):
             await self._simulate_human_behavior()
 
             # 填写文章内容
-            logger.info(f"[{self.platform_name}] 开始填写文章内容...")
-            await self.fill_article_content()
-            logger.info(f"[{self.platform_name}] ✓ 文章内容填写完成")
+            logger.info(f"[{self.platform_name}] ========== 开始填写文章内容 ==========")
+            try:
+                await self.fill_article_content()
+                logger.info(f"[{self.platform_name}] ✓ 文章内容填写完成")
+            except Exception as fill_error:
+                logger.error(f"[{self.platform_name}] ✗ 填写文章内容时出错: {type(fill_error).__name__}: {str(fill_error)}")
+                logger.error(f"[{self.platform_name}] 当前页面 URL: {self.page.url if self.page else 'N/A'}")
+                raise
 
             # 反检测：填写后随机延迟
             if config.human_behavior_enabled:
@@ -460,23 +508,30 @@ class BasePlatformHandler(ABC):
             return result
 
         except Exception as e:
-            logger.error(
-                f"[{self.platform_name}] 发布过程出错: {str(e)}", exc_info=True
-            )
+            logger.error(f"[{self.platform_name}] ========== 发布过程出错 ==========")
+            logger.error(f"[{self.platform_name}] 错误类型: {type(e).__name__}")
+            logger.error(f"[{self.platform_name}] 错误信息: {str(e)}")
+            logger.error(f"[{self.platform_name}] 当前页面 URL: {self.page.url if self.page else 'N/A'}")
+            logger.error(f"[{self.platform_name}] 详细堆栈:", exc_info=True)
             return PublishResult(
                 success=False,
-                message=f"发布过程出错: {str(e)}",
+                message=f"发布过程出错: {type(e).__name__}: {str(e)}",
             )
 
         finally:
             # 清理资源
-            logger.debug(f"[{self.platform_name}] 清理资源...")
+            logger.info(f"[{self.platform_name}] ========== 清理资源（即将关闭浏览器） ==========")
+            logger.debug(f"[{self.platform_name}] 浏览器状态: {'存在' if self.browser else '不存在'}")
+            logger.debug(f"[{self.platform_name}] Playwright 状态: {'存在' if self.playwright else '不存在'}")
+
             if self.browser:
+                logger.info(f"[{self.platform_name}] 正在关闭浏览器...")
                 await self.browser.close()
-                logger.debug(f"[{self.platform_name}] ✓ 浏览器已关闭")
+                logger.info(f"[{self.platform_name}] ✓ 浏览器已关闭")
             if self.playwright:
+                logger.info(f"[{self.platform_name}] 正在停止 Playwright...")
                 await self.playwright.stop()
-                logger.debug(f"[{self.platform_name}] ✓ Playwright 已停止")
+                logger.info(f"[{self.platform_name}] ✓ Playwright 已停止")
             logger.info(f"[{self.platform_name}] ===== 发布结束 =====\n")
 
     # ==================== 辅助方法 ====================
@@ -500,9 +555,7 @@ class BasePlatformHandler(ABC):
                 return True
 
             # 方式 2: 检查是否存在登录相关的元素
-            from Modules.common.libs.config.registry import ConfigRegistry
-
-            config = ConfigRegistry.get("content")
+            config = Config.get("content")
             if config:
                 login_button = await self.page.query_selector(
                     config.zhihu_login_selector
@@ -542,9 +595,7 @@ class BasePlatformHandler(ABC):
         Args:
             scroll_count: 滚动次数，None 则使用配置的随机值
         """
-        from Modules.common.libs.config.registry import ConfigRegistry
-
-        config = ConfigRegistry.get("content")
+        config = Config.get("content")
         if config is None or not config.human_behavior_enabled:
             return
 
@@ -576,9 +627,7 @@ class BasePlatformHandler(ABC):
         """
         assert self.page is not None, "页面未初始化"
 
-        from Modules.common.libs.config.registry import ConfigRegistry
-
-        config = ConfigRegistry.get("content")
+        config = Config.get("content")
         if config is None or not config.human_behavior_enabled:
             return
 
@@ -615,9 +664,7 @@ class BasePlatformHandler(ABC):
 
     async def _simulate_human_behavior(self) -> None:
         """模拟人类浏览行为（滚动 + 鼠标移动）"""
-        from Modules.common.libs.config.registry import ConfigRegistry
-
-        config = ConfigRegistry.get("content")
+        config = Config.get("content")
         if config is None or not config.human_behavior_enabled:
             return
 

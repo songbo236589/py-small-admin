@@ -8,6 +8,7 @@ from typing import Any
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from fastapi_pagination.ext.sqlalchemy import paginate
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
 from Modules.common.libs.database.sql.session import get_async_session
@@ -19,6 +20,12 @@ from Modules.content.models.content_article import ContentArticle
 from Modules.content.models.content_platform_account import ContentPlatformAccount
 from Modules.content.models.content_publish_log import ContentPublishLog
 from Modules.content.services.publisher import ZhihuHandler
+from Modules.content.services.publisher.toutiao_handler import (
+    ToutiaoHandler,
+)
+from Modules.content.services.publisher.xiaohongshu_handler import (
+    XiaohongshuHandler,
+)
 
 
 class PublishService(BaseService):
@@ -77,6 +84,7 @@ class PublishService(BaseService):
             publish_log = ContentPublishLog(
                 article_id=article_id,
                 platform=platform,  # type: ignore
+                platform_account_id=platform_account_id,  # 保存平台账号ID
                 status=0,  # 待发布
                 created_at=now(),  # 设置创建时间
             )
@@ -109,6 +117,18 @@ class PublishService(BaseService):
                         user_agent=user_agent,
                         article_data=article_data,
                     )
+                elif platform == "xiaohongshu":
+                    handler = XiaohongshuHandler(
+                        cookies=cookies,
+                        user_agent=user_agent,
+                        article_data=article_data,
+                    )
+                elif platform == "toutiao":
+                    handler = ToutiaoHandler(
+                        cookies=cookies,
+                        user_agent=user_agent,
+                        article_data=article_data,
+                    )
                 else:
                     return error(f"不支持的平台: {platform}")
 
@@ -121,9 +141,11 @@ class PublishService(BaseService):
                     publish_log.platform_article_id = result.platform_article_id
                     publish_log.platform_url = result.platform_url
                     publish_log.error_message = None
+                    publish_log.completed_at = now()
                 else:
                     publish_log.status = 3  # 失败
                     publish_log.error_message = result.message[:500]  # 限制错误信息长度
+                    publish_log.completed_at = now()
 
                 await session.commit()
 
@@ -143,6 +165,7 @@ class PublishService(BaseService):
                 # 发布失败，更新日志状态
                 publish_log.status = 3  # 失败
                 publish_log.error_message = f"发布异常: {str(e)}"[:500]
+                publish_log.completed_at = now()
                 await session.commit()
 
                 return error(f"发布失败: {str(e)}")
@@ -227,15 +250,42 @@ class PublishService(BaseService):
         page = data.get("page", 1)
         size = data.get("limit", 20)
         # 精确匹配字段字典
-        data["exact_fields"] = ["platform", "status", "article_id"]
+        data["exact_fields"] = ["platform", "status"]
         # 应用范围筛选
-        data["range_fields"] = ["created_at"]
+        data["range_fields"] = ["created_at", "completed_at"]
 
         async with get_async_session() as session:
-            # 构建基础查询
-            query = select(ContentPublishLog)
-            # 搜索
+            # 构建基础查询，使用 selectinload 预加载关联数据
+            query = select(ContentPublishLog).options(
+                selectinload(ContentPublishLog.article).load_only(
+                    *[ContentArticle.id, ContentArticle.title]
+                ),
+                selectinload(ContentPublishLog.platform_account).load_only(
+                    *[ContentPlatformAccount.id, ContentPlatformAccount.account_name]
+                ),
+            )
+
+            # 应用精确匹配和范围筛选
             query = await self.apply_search_filters(query, ContentPublishLog, data)
+
+            # 文章标题模糊搜索（需要 join）
+            article_title = data.get("article_title")
+            if article_title:
+                query = query.join(
+                    ContentArticle, ContentPublishLog.article_id == ContentArticle.id
+                )
+                query = query.where(ContentArticle.title.like(f"%{article_title}%"))  # type: ignore
+
+            # 账号名称模糊搜索（需要 join）
+            account_name = data.get("account_name")
+            if account_name:
+                query = query.outerjoin(
+                    ContentPlatformAccount,
+                    ContentPublishLog.platform_account_id == ContentPlatformAccount.id,
+                )
+                query = query.where(
+                    ContentPlatformAccount.account_name.like(f"%{account_name}%")  # type: ignore
+                )
 
             # 应用排序（默认按创建时间倒序）
             if not data.get("sort"):
@@ -254,13 +304,17 @@ class PublishService(BaseService):
                 d["created_at"] = (
                     format_datetime(log.created_at) if log.created_at else None
                 )
-                # 获取文章标题
-                article_result = await session.execute(
-                    select(ContentArticle.title).where(
-                        ContentArticle.id == log.article_id
-                    )
+                d["completed_at"] = (
+                    format_datetime(log.completed_at) if log.completed_at else None
                 )
-                d["article_title"] = article_result.scalar_one_or_none()
+                # 从关联对象获取数据
+                d["article_title"] = log.article.title if log.article else None
+                d["account_name"] = (
+                    log.platform_account.account_name if log.platform_account else None
+                )
+                # 移除关联对象，避免序列化问题
+                d.pop("article", None)
+                d.pop("platform_account", None)
                 items.append(d)
             return success(
                 jsonable_encoder(
@@ -338,27 +392,105 @@ class PublishService(BaseService):
             if log.retry_count >= 3:
                 return error("重试次数已达上限，请检查配置或手动处理")
 
-            # 更新状态为待发布
-            log.status = 0  # 待发布
-            log.retry_count += 1
-            log.error_message = None
-            await session.commit()
-
-            # TODO: 创建重试发布任务
-            # 需要获取平台账号ID或从发布日志中获取
-            # 示例：
-            # from Modules.content.queues.publish_queue import publish_article_task
-            # task = publish_article_task.delay(log.id, log.article_id, log.platform)
-            # log.task_id = task.id
-            # await session.commit()
-
-            return success(
-                {
-                    "log_id": log.id,
-                    "retry_count": log.retry_count,
-                    "message": "重试任务已创建",
-                }
+            # 验证文章是否存在
+            article_result = await session.execute(
+                select(ContentArticle).where(ContentArticle.id == log.article_id)
             )
+            article = article_result.scalar_one_or_none()
+            if not article:
+                return error("文章不存在")
+
+            # 验证平台账号是否存在且匹配
+            account_result = await session.execute(
+                select(ContentPlatformAccount).where(
+                    ContentPlatformAccount.id == log.platform_account_id,
+                    ContentPlatformAccount.platform == log.platform,
+                )
+            )
+            account = account_result.scalar_one_or_none()
+            if not account:
+                return error("平台账号不存在或不匹配")
+
+            # 执行重试发布
+            try:
+                # 更新状态为发布中
+                log.status = 1  # 发布中
+                log.retry_count += 1
+                log.error_message = None
+                await session.commit()
+
+                # 准备文章数据
+                article_data = {
+                    "title": article.title,
+                    "content": article.content or "",
+                    "summary": article.summary or "",
+                }
+
+                # 解析 Cookies
+                cookies = json.loads(account.cookies) if account.cookies else []
+                user_agent = account.user_agent
+
+                # 根据平台选择处理器
+                handler = None
+                if log.platform == "zhihu":
+                    handler = ZhihuHandler(
+                        cookies=cookies,
+                        user_agent=user_agent,
+                        article_data=article_data,
+                    )
+                elif log.platform == "xiaohongshu":
+                    handler = XiaohongshuHandler(
+                        cookies=cookies,
+                        user_agent=user_agent,
+                        article_data=article_data,
+                    )
+                elif log.platform == "toutiao":
+                    handler = ToutiaoHandler(
+                        cookies=cookies,
+                        user_agent=user_agent,
+                        article_data=article_data,
+                    )
+                else:
+                    return error(f"不支持的平台: {log.platform}")
+
+                # 执行发布
+                result = await handler.publish()
+
+                # 更新发布结果
+                if result.success:
+                    log.status = 2  # 成功
+                    log.platform_article_id = result.platform_article_id
+                    log.platform_url = result.platform_url
+                    log.error_message = None
+                    log.completed_at = now()
+                else:
+                    log.status = 3  # 失败
+                    log.error_message = result.message[:500]  # 限制错误信息长度
+                    log.completed_at = now()
+
+                await session.commit()
+
+                return success(
+                    {
+                        "log_id": log.id,
+                        "article_id": log.article_id,
+                        "platform": log.platform,
+                        "status": log.status,
+                        "platform_article_id": log.platform_article_id,
+                        "platform_url": log.platform_url,
+                        "retry_count": log.retry_count,
+                        "message": result.message,
+                    }
+                )
+
+            except Exception as e:
+                # 发布失败，更新日志状态
+                log.status = 3  # 失败
+                log.error_message = f"发布异常: {str(e)}"[:500]
+                log.completed_at = now()
+                await session.commit()
+
+                return error(f"发布失败: {str(e)}")
 
     async def destroy(self, id: int) -> JSONResponse:
         """删除发布记录
@@ -396,10 +528,6 @@ class PublishService(BaseService):
         if not log:
             return error("发布记录不存在")
 
-        # 检查是否有正在执行的任务
-        if log.status == 1:  # 1=发布中
-            return error("无法删除正在执行中的发布任务")
-
         return (session,)
 
     async def destroy_all(self, id_array: list[int]) -> JSONResponse:
@@ -429,16 +557,4 @@ class PublishService(BaseService):
         Returns:
             验证失败时返回错误响应，成功时返回(id_array, session)
         """
-        # 检查是否有正在执行的任务
-        running_logs = await session.execute(
-            select(ContentPublishLog.id).where(
-                ContentPublishLog.id.in_(id_array),  # type: ignore
-                ContentPublishLog.status == 1,  # 1=发布中
-            )
-        )
-        running_log_ids = running_logs.scalars().all()
-
-        if running_log_ids:
-            return error("无法删除正在执行中的发布任务")
-
         return id_array, session

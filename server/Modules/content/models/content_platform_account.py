@@ -5,12 +5,17 @@
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, DateTime, SmallInteger, String, Text
 from sqlalchemy.dialects.mysql import INTEGER
-from sqlmodel import Field
+from sqlalchemy.orm import Mapped
+from sqlmodel import Field, Relationship
 
 from Modules.common.models.base_model import BaseTableModel
+
+if TYPE_CHECKING:
+    from .content_publish_log import ContentPublishLog
 
 
 class ContentPlatformAccount(BaseTableModel, table=True):
@@ -97,6 +102,11 @@ class ContentPlatformAccount(BaseTableModel, table=True):
     updated_at: datetime | None = Field(
         sa_column=Column(DateTime(), nullable=True, comment="更新时间", index=True),
         default=None,
+    )
+
+    # 一对多：平台账号 → 发布日志
+    publish_logs: Mapped[list["ContentPublishLog"]] = Relationship(
+        back_populates="platform_account"
     )
 
     class Config:

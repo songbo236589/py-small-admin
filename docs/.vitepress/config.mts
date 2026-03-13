@@ -150,12 +150,14 @@ function createSidebar() {
             { text: '快速启动', link: 'getting-started/quick-start' },
             { text: '目录结构', link: 'getting-started/directory' },
             { text: '配置说明', link: 'getting-started/configuration' },
+            { text: '快速参考', link: 'quick-reference' },
           ],
         },
         {
           text: '工具指南',
           items: [
-            { text: '浏览器扩展', link: 'browser-extension' },
+            { text: '浏览器扩展开发', link: 'browser-extension-dev' },
+            { text: '浏览器扩展使用', link: 'browser-extension' },
           ],
         },
         {
@@ -175,12 +177,14 @@ function createSidebar() {
             { text: '开发环境搭建', link: 'backend/' },
             { text: '后端架构', link: 'backend/architecture' },
             { text: '模块开发规范', link: 'backend/module-guide' },
-            { text: '数据库设计',
+            {
+              text: '数据库设计',
               items: [
                 { text: '数据库概览', link: 'backend/database/' },
                 { text: '模型定义', link: 'backend/database/models' },
                 { text: 'Admin 模块表结构', link: 'backend/database/admin-models' },
                 { text: 'Quant 模块表结构', link: 'backend/database/quant-models' },
+                { text: 'Content 模块表结构', link: 'backend/database/content-models' },
                 { text: '数据库迁移', link: 'backend/database/migrations' },
               ],
             },
@@ -193,14 +197,17 @@ function createSidebar() {
                 { text: '认证授权', link: 'backend/api/authentication' },
               ],
             },
-            { text: '异步任务',
+            {
+              text: '异步任务',
               items: [
                 { text: '异步任务开发', link: 'backend/async/' },
                 { text: 'Celery 使用指南', link: 'backend/async/celery-guide' },
+                { text: 'Celery 异步任务', link: 'backend/async/celery-tasks' },
                 { text: '任务清单', link: 'backend/async/task-list' },
               ],
             },
-            { text: '特色功能',
+            {
+              text: '特色功能',
               items: [
                 { text: '文件上传', link: 'backend/features/upload' },
                 { text: '缓存使用', link: 'backend/features/cache' },
@@ -208,6 +215,8 @@ function createSidebar() {
                 { text: '数据验证', link: 'backend/features/validation' },
                 { text: '异常处理', link: 'backend/features/exception' },
                 { text: '浏览器自动化', link: 'backend/features/browser' },
+                { text: '话题管理', link: 'backend/features/topic-fetch' },
+                { text: '文章发布', link: 'backend/features/article-publish-tutorial' },
                 { text: '内容发布', link: 'backend/features/content-publish' },
               ],
             },
